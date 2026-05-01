@@ -2,6 +2,8 @@
 
 > 既存のコードベースから仕様書を逆生成(リバースエンジニアリング)するための Claude Code スキル
 
+📖 **English version available below** — [Jump to English →](#english-version)
+
 `cc-rsg` は、レガシーまたは現役のコードベースから、メンテナンス担当者あるいは納品先顧客に向けた仕様書を自動生成するための汎用フレームワークです。
 
 「コード → 仕様」の **reverse 方向** を担うスキルであり、`cc-sdd`(Spec Driven Development、仕様駆動開発)の対概念として位置づけられています。
@@ -252,3 +254,263 @@ MIT License。詳細は [LICENSE](LICENSE) を参照。
 
 > "綺麗で完成度の高い仕様書よりも、正直で穴が見えている仕様書のほうが実務的価値が高い。"
 > — `cc-rsg` 設計原則より
+
+---
+---
+
+# English Version
+
+# cc-rsg — Claude Code Reverse Spec Generation
+
+> A Claude Code skill that reverse-engineers specification documents from existing codebases
+
+`cc-rsg` is a general-purpose framework for automatically generating specification documents — for maintenance engineers or end customers — from legacy or active codebases.
+
+It is the **reverse direction** counterpart of `cc-sdd` (Spec Driven Development): while `cc-sdd` goes "spec → code", `cc-rsg` goes "code → spec".
+
+---
+
+## Why This Was Built
+
+Legacy system modernization, codebase onboarding for new engineers, deliverable spec docs, internal knowledge consolidation — across all these scenarios, the problem of "we have the code but no reliable specification" is universal.
+
+In the LLM era, asking an AI to "make a spec from this code" produces visually polished documents instantly. But in practice, if that document turns out to be "beautiful fiction filled with guesses", it breaks down in production.
+
+`cc-rsg` prioritizes:
+
+- **Honesty**: Don't hide guesses — mark them explicitly. Show "unresolved items" as a dedicated chapter
+- **Traceability**: Every statement has a source code reference with line numbers
+- **Completeness**: Enumerate all extractable units from the code, mechanically verify coverage
+- **Progressive elaboration**: Recon → skeleton → chapter drafts → verify → dialog refine
+- **Resumability**: Long sessions can be paused and resumed
+
+---
+
+## Design Heritage
+
+`cc-rsg` is positioned as the latest generation in the following lineage:
+
+- **KDM (Knowledge Discovery Metamodel, ISO/IEC 19506:2012)**: Language-neutral structured knowledge representation
+- **OMG ADM (Architecture-Driven Modernization)**: MDRE (Model-Driven Reverse Engineering)
+- **Siala & Lano (2025)**: LLM × MDRE empirical integration research
+- **Reversa** (OSS): Modern form of "agent-readable executable specifications"
+- **IBM watsonx Code Assistant for Z / AWS Transform / CAST Imaging**: "Deterministic graph + LLM natural language" hybrid architecture
+
+`cc-rsg` builds on these by maximizing Claude Code features (SKILL.md, subagents, AskUserQuestion, Task) into a general-purpose framework.
+
+---
+
+## Installation
+
+### Place into your Claude Code environment
+
+```bash
+# As a project-level skill
+mkdir -p .claude/skills/
+cp -r skills/cc-rsg .claude/skills/
+
+# Or as a user-level skill
+mkdir -p ~/.claude/skills/
+cp -r skills/cc-rsg ~/.claude/skills/
+```
+
+### Verify installation
+
+Launch Claude Code and run `/help` — `cc-rsg` should appear in the skill list.
+
+---
+
+## Usage
+
+### Basic Flow
+
+```
+1. Launch Claude Code at the target codebase root
+2. Invoke the cc-rsg skill
+3. Answer the 5-question goal definition (Phase 0)
+4. Review recon results and pick a template (Phase 1)
+5. Review the WBS and inventory (Phase 2)
+6. Wait for parallel subagent investigation (Phase 3)
+7. Review the verification report (Phase 4)
+8. Refine the spec via Question Bank dialogue (Phase 5)
+9. Receive the final deliverables (Phase 6)
+```
+
+### Pause and Resume
+
+Even if you interrupt the session, progress is saved to `.cc-rsg/state.json`. On the next Claude Code launch, a resume message appears with options: continue / rewind / full reset.
+
+### Output Location
+
+A `.cc-rsg/` directory is created at the root of the target project, containing:
+
+```
+.cc-rsg/
+├── state.json          # Progress tracking
+├── goal.json           # Phase 0 goal definition
+├── recon-report.md     # Phase 1 reconnaissance
+├── inventory.json      # All inventory items
+├── wbs.json            # Work breakdown
+├── questions.json      # Question Bank
+├── drafts/             # Per-chapter drafts
+└── final/              # Final deliverables
+```
+
+---
+
+## 6-Phase State Machine
+
+| Phase | Name | Main Action |
+|-------|------|-------------|
+| 0 | Setup & Goal | 5-question goal definition (scope, reader, granularity) |
+| 1 | Recon & Template | Shallow reconnaissance and template selection |
+| 2 | Plan & WBS | Skeleton generation, inventory extraction, WBS breakdown |
+| 3 | Investigate | Parallel subagents generate per-chapter drafts |
+| 4 | Verify | Coverage, integrity, and checklist verification |
+| 5 | Refine via Dialogue | Question Bank dialog to resolve uncertainty |
+| 6 | Deliver | Output final deliverables to `.cc-rsg/final/` |
+
+See [`skills/cc-rsg/SKILL.md`](skills/cc-rsg/SKILL.md) for details.
+
+---
+
+## Supported Languages and Typical Units
+
+`references/inventory-units.md` covers the following languages:
+
+- PHP (Laravel / Symfony / CakePHP, etc.)
+- COBOL (+ JCL)
+- Python (Django / Flask / FastAPI, etc.)
+- Java (Spring family)
+- JavaScript / TypeScript (Express / Next.js / NestJS, etc.)
+- C# (ASP.NET Core, etc.)
+
+Unsupported languages can be added on request via GitHub Issues.
+
+---
+
+## Templates
+
+Initial set of 4 templates included:
+
+- **Web Application Spec** (`templates/web-app.md`)
+- **Batch System Spec** (`templates/batch-system.md`)
+- **API Service Spec** (`templates/api-service.md`)
+- **Library/SDK Spec** (`templates/library-sdk.md`)
+
+Users can also bring their own templates.
+
+---
+
+## Question Bank
+
+`cc-rsg` accumulates questions raised during investigation in `.cc-rsg/questions.json`.
+
+### 7 Standard Categories
+
+1. **business_rule**
+2. **architecture_decision**
+3. **data_model_intent**
+4. **external_integration**
+5. **naming_history**
+6. **operational_requirement**
+7. **security_compliance**
+
+### Severity
+
+- **critical**: Chapter cannot be written without resolving this
+- **important**: Can be written by guess but with low confidence
+- **nice-to-have**: Detail-level refinement
+
+### Unanswerable Questions
+
+Questions that will never get an answer ("the SME left the company", "no one remembers the historical context") are marked as `abandoned` and explicitly recorded in the "Unresolved Items" chapter of the final spec.
+
+This is the foundation of the spec's trustworthiness.
+
+---
+
+## Directory Structure
+
+```
+cc-rsg/
+├── README.md
+├── LICENSE
+├── .gitignore
+└── skills/
+    └── cc-rsg/
+        ├── SKILL.md
+        ├── references/
+        │   ├── inventory-units.md
+        │   ├── template-catalog.md
+        │   ├── question-categories.md
+        │   ├── verification-checklists.md
+        │   └── subagent-prompt.md
+        ├── templates/
+        │   ├── web-app.md
+        │   ├── batch-system.md
+        │   ├── api-service.md
+        │   └── library-sdk.md
+        └── scripts/
+            └── coverage-check.py
+```
+
+---
+
+## Status
+
+Currently v0.1.0 (initial draft).
+
+### Known Limitations
+
+- Custom category addition requires manual JSON editing (UI mechanism is a future extension)
+- MCP integration is not implemented (designed for standalone Claude Code)
+- Slash command options (`--restart`, etc.) are not implemented
+
+### Roadmap (tentative)
+
+- v0.2: Add templates based on user feedback
+- v0.3: UI for custom categories
+- v1.0: Stable release after several real-project applications
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Contributing
+
+Feedback, template requests, and bug reports are welcome via GitHub Issues.
+
+Particularly welcome contributions:
+
+- Inventory unit definitions for new languages/frameworks
+- New templates (DWH, ML pipeline, IaC, mobile, etc.)
+- Verification checklist additions
+- Real-project application reports
+
+---
+
+## Related Projects
+
+- **cc-sdd**: Spec Driven Development. The counterpart concept of `cc-rsg`
+- **Reversa**: Similar OSS with a 5-phase pipeline
+
+---
+
+## Acknowledgments
+
+The design draws significant inspiration from:
+
+- The OMG community that standardized KDM (ISO/IEC 19506:2012)
+- sandeco, the author of Reversa
+- Siala & Lano (2025) "LLM4Models" paper
+- Thoughtworks' review articles on AI-generated specifications
+
+---
+
+> "An honest spec with visible holes is more practically valuable than a polished spec full of fiction."
+> — from the `cc-rsg` design principles
