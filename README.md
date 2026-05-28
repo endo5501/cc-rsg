@@ -1,4 +1,4 @@
-# cc-rsg — Claude Code Reverse Spec Generation
+# cc-rsg — Claude Code Reverse Spec Generator
 
 > 既存のコードベースから仕様書を逆生成(リバースエンジニアリング)するための Claude Code スキル
 
@@ -268,7 +268,7 @@ MIT License。詳細は [LICENSE](LICENSE) を参照。
 
 # English Version
 
-# cc-rsg — Claude Code Reverse Spec Generation
+# cc-rsg — Claude Code Reverse Spec Generator
 
 > A Claude Code skill that reverse-engineers specification documents from existing codebases
 

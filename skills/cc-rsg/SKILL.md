@@ -4,7 +4,7 @@ description: 既存のコードベースから仕様書を逆生成(リバース
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task, AskUserQuestion, WebFetch, WebSearch
 ---
 
-# cc-rsg (Claude Code Reverse Spec Generation)
+# cc-rsg (Claude Code Reverse Spec Generator)
 
 既存のコードベース(レガシーまたは現役を問わず)から、メンテナンス担当者あるいは納品先顧客に向けた仕様書を逆生成する汎用フレームワーク。
 
