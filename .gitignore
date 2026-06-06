@@ -4,6 +4,10 @@
 # 設計議論ドキュメント(社内検証用に手元保管)
 HANDOFF.md
 
+# Claude 向けローカル運用メモ(マシン固有のパス等を含むため非公開)
+CLAUDE.md
+CLAUDE.local.md
+
 # Claude Code 関連の作業ファイル
 outputs/
 logs/
