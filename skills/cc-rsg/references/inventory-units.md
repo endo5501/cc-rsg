@@ -510,8 +510,124 @@ grep -rEn "\\[Http(Get|Post|Put|Patch|Delete)\\]" src/ --include="*.cs"
 
 ## 抽出時のClaudeへの指示要約
 
-1. 対象コードベースの主要言語を特定する(`recon-report.md`から)。
-2. 該当言語のセクションを参照し、抽出戦略を立てる。
-3. 上記の抽出例を参考に、bash / grep / 言語別ツール(ast-grep, tree-sitter等)で列挙する。
-4. 結果を`inventory.json`に保存する。スキーマは SKILL.md の Phase 2 を参照。
-5. 抽出時に検出されたコメントアウト・廃止予定コード・テストコードはタグ付けして区別する(`"deprecated": true`等)。
+1. **まず `scripts/source-map.py --target <root>` を実行する**。これでファイル単位のソースユニット (SRC-NNNN) が自動抽出され、`.cc-rsg/source-map.json` に保存される。
+2. 対象コードベースの主要言語を特定する（`recon-report.md`から）。
+3. 該当言語のセクションを参照し、抽出戦略を立てる。
+4. **source-map.json の units を概念単位にグループ化する**。多対1（複数の SRC → 1 INV）はOK、ただし下記の粒度規定に従う。
+5. 結果を `inventory.json` に保存する。スキーマは SKILL.md の Phase 2 を参照。各 inventory_item には対応する複数の SRC-NNNN を `related_source_ids` フィールドで記録すると Phase 4 検証で利用できる。
+6. 抽出時に検出されたコメントアウト・廃止予定コード・テストコードはタグ付けして区別する（`"deprecated": true` 等）。
+
+---
+
+## 粒度規定（必須遵守）
+
+### 最低件数
+
+```
+inventory.json 最低件数 = max(50, files_scanned // 20)
+```
+
+- 例: 1,000 ファイルの Rails プロジェクト → 最低 50 件
+- 例: 5,000 ファイルの大規模 JS プロジェクト → 最低 250 件
+
+`scripts/coverage-check.py` がこの基準で fail を返す。**`source-map.json` の `stats.files_scanned` から自動算出**される。
+
+### macro 単位の禁止
+
+❌ **以下のようなグルーピング型 INV は禁止**:
+- `controller_group`「Account 系コントローラ群」 ← Account, Sessions, Twofa など複数を1つにまとめる
+- `model_group`「ユーザー系モデル群」 ← User, Group, Member などをまとめる
+- `module_group`「Wiki/Document 系」 ← 複数の独立した責務をまとめる
+
+これらは粒度として粗すぎ、保守担当者がどのファイルに修正を入れればよいか判別不能になる。
+
+✅ **正しい粒度**:
+- 1 controller class = 1 INV
+- 1 model class = 1 INV
+- 1 service class = 1 INV
+- 1 job class = 1 INV
+- 1 concern module = 1 INV
+- 1 mailer class = 1 INV
+- 大規模 controller (300行+) の場合は **action ごとの追加 INV を許可**
+
+`scripts/coverage-check.py` は `type` フィールドに `group` / `module` / `domain` / `category` / `bundle` / `section` を含む INV を「macro 型」と見なし、**全 INV の 20% を超えると fail**。
+
+---
+
+## Ruby on Rails 用カタログ（詳細）
+
+Rails アプリケーションに対しては、以下の単位で必ず抽出する。**この一覧を満たさない inventory.json は不合格**とみなす。
+
+### 1. Controller（`app/controllers/**/*.rb`）
+- `_controller.rb` で終わる全ファイル × 1 INV
+- type: `controller`
+- name: クラス名（例: `IssuesController`）
+- file: 該当ファイル
+- 大規模コントローラ（300行以上）は **action 単位の追加 INV も可** (type: `controller_action`)
+
+### 2. Model（`app/models/**/*.rb`）
+- 全 model class × 1 INV（ApplicationRecord 直接継承 / Principal/User の様な間接継承を含む）
+- type: `model` / `model_subclass`
+- name: クラス名（例: `Issue`, `Project`）
+
+### 3. Concern（`app/controllers/concerns/`, `app/models/concerns/`）
+- 1 module = 1 INV
+- type: `concern`
+
+### 4. Service / Use Case（`app/services/`, `app/use_cases/`, `lib/services/`）
+- 1 class = 1 INV
+- type: `service`
+
+### 5. Job（`app/jobs/**/*.rb`）
+- 1 class = 1 INV
+- type: `job`
+
+### 6. Mailer（`app/mailers/**/*.rb`）
+- 1 class = 1 INV
+- type: `mailer`
+
+### 7. Helper（`app/helpers/**/*.rb`）
+- 1 module = 1 INV
+- type: `helper`
+
+### 8. Lib（`lib/**/*.rb`）
+- 1 class または 1 module = 1 INV
+- type: `lib_class` / `lib_module`
+
+### 9. Migration（`db/migrate/**/*.rb`）
+- 1 migration file = 1 INV（テーブル単位として扱う）
+- type: `migration`
+- name: マイグレーションクラス名（例: `CreateIssues`）
+
+### 10. Route group（`config/routes.rb`）
+- `resources :foo do … end` ブロック単位 × 1 INV
+- `namespace :api do … end` ブロック単位 × 1 INV
+- type: `rails_route`
+- name: `resources:issues` / `namespace:api/v1` のような prefix 付き名前
+
+### 11. View group（`app/views/**`）
+- リソース単位（例: `app/views/issues/`）でグループ化 × 1 INV
+- type: `view_group`
+- name: ディレクトリ名
+
+### 12. JavaScript module（`app/javascript/**`）
+- 1 export = 1 INV（ファイル数が少なければファイル単位）
+- type: `js_export`
+
+### 13. 設定ファイル（`config/*.yml`, `config/initializers/**/*.rb`）
+- 重要な initializer は 1 file = 1 INV
+- type: `config`
+
+### 14. Mailer template（`app/views/mailer/**/*.erb`）
+- 1 file = 1 INV
+- type: `mailer_view`
+
+### Rails 粒度の参考目安
+
+| Rails アプリ規模 | 最低 INV | 内訳目安 |
+|----------------|---------|---------|
+| 小（100 .rb） | 50 件 | controllers 10, models 15, jobs 3, lib 5, migration 10, route 5, view 2 |
+| 中（500 .rb） | 50 件 | controllers 30, models 50, services 20, jobs 10, migration 30, route 15, helpers 10 |
+| 大（1,000+ .rb） | 90 件以上 | controllers 80, models 80, concerns 20, services 30, jobs 20, migration 100+, route 30 |
+
+例: Redmine は 1,095 .rb → 最低 **93 件** の INV が必要（agent が `30 件` で終わらせるのは粒度不足）。
