@@ -2,44 +2,44 @@
 template_name: library-sdk
 template_version: 0.1.0
 last_updated: 2026-05-01
-description: ライブラリ/SDK仕様書テンプレート。npm/pip/composer/gem/NuGet等の再利用可能なコード資産向け。
+description: Library / SDK spec template. For reusable code packages distributed via npm/pip/composer/gem/NuGet, etc.
 ---
 
-# ライブラリ / SDK仕様書テンプレート
+# Library / SDK spec template
 
-このテンプレートは、他のアプリから利用される再利用可能なコード資産(ライブラリ・SDK)の仕様書を生成するための章立てを定義する。
+This template defines the chapter outline for the spec of a reusable code asset (library / SDK) consumed by other applications.
 
-npm / pip / composer / gem / NuGet / Maven Central等で配布されるパッケージ、または社内の共通ライブラリを想定。
-
----
-
-## 章立て
-
-### 第1章: 概要
-
-<!-- meta: ライブラリの目的とスコープ。 -->
-
-#### 1.1 ライブラリ目的
-- このライブラリが解決する問題
-- 想定利用者
-- 競合・代替ライブラリとの差別化
-
-#### 1.2 主要機能
-- 主要機能3〜5件
-- 各機能の概要
-
-#### 1.3 ライセンス・パッケージ情報
-- ライセンス種別
-- パッケージ名 / 配布チャンネル
-- 現行バージョン
+Designed for packages distributed via npm / pip / composer / gem / NuGet / Maven Central, etc., as well as internal common libraries.
 
 ---
 
-### 第2章: インストール方法
+## Chapter outline
 
-<!-- meta: 利用開始までの手順。 -->
+### Chapter 1: Overview
 
-#### 2.1 パッケージマネージャ別コマンド
+<!-- meta: purpose and scope of the library. -->
+
+#### 1.1 Library purpose
+- The problem this library solves
+- Intended consumers
+- Differentiation from competing or alternative libraries
+
+#### 1.2 Main features
+- 3-5 main features
+- Summary of each feature
+
+#### 1.3 License / package information
+- License type
+- Package name / distribution channel
+- Current version
+
+---
+
+### Chapter 2: Installation
+
+<!-- meta: steps to start using the library. -->
+
+#### 2.1 Per-package-manager commands
 ```bash
 # npm
 npm install <package-name>
@@ -60,46 +60,46 @@ gem install <package-name>
 dotnet add package <PackageName>
 ```
 
-#### 2.2 動作要件
-- 対応言語バージョン
-- 対応OS
-- 必須の周辺ツール
+#### 2.2 Runtime requirements
+- Supported language versions
+- Supported operating systems
+- Required surrounding tools
 
-#### 2.3 オプショナル依存
-- インストール時に追加で必要なもの
-- 機能別の追加依存
+#### 2.3 Optional dependencies
+- Anything extra needed at install time
+- Per-feature additional dependencies
 
 ---
 
-### 第3章: 公開API一覧
+### Chapter 3: Public API catalogue
 
-<!-- meta: 全公開APIのインベントリ。検証の主軸。 -->
+<!-- meta: inventory of all public APIs. The pillar of verification. -->
 
-#### 3.1 API カタログ
-| API名 | 種別 | シグネチャ | 概要 | 安定性 |
+#### 3.1 API catalogue
+| API name | Kind | Signature | Summary | Stability |
 |------|-----|----------|------|-------|
-| `connect()` | 関数 | `connect(config: Config) → Client` | クライアント生成 | stable |
-| `Client.query()` | メソッド | `query(sql: string) → Result` | クエリ実行 | stable |
-| `parse()` | 関数 | `parse(input: string) → AST` | パース | beta |
+| `connect()` | function | `connect(config: Config) → Client` | Create a client | stable |
+| `Client.query()` | method | `query(sql: string) → Result` | Run a query | stable |
+| `parse()` | function | `parse(input: string) → AST` | Parse input | beta |
 | ... | ... | ... | ... | ... |
 
-#### 3.2 モジュール構成
-- パッケージ内のモジュール構造
-- 主要エクスポート
+#### 3.2 Module structure
+- Module structure inside the package
+- Main exports
 
-#### 3.3 安定性レベル
-- stable: 後方互換性を保証
-- beta: メジャーバージョン内で破壊的変更の可能性
-- experimental: 任意のバージョンで変更の可能性
-- deprecated: 廃止予定
+#### 3.3 Stability levels
+- stable: backward compatibility is guaranteed
+- beta: may have breaking changes within a major version
+- experimental: may change in any version
+- deprecated: scheduled for removal
 
 ---
 
-### 第4章: 利用例(クイックスタート)
+### Chapter 4: Usage examples (quick start)
 
-<!-- meta: 「これを読めばすぐ使える」サンプル。 -->
+<!-- meta: "read this and start using it" samples. -->
 
-#### 4.1 最小限の例
+#### 4.1 Minimal example
 ```javascript
 import { connect } from 'mylib';
 
@@ -108,108 +108,108 @@ const result = client.query('SELECT 1');
 console.log(result);
 ```
 
-#### 4.2 主要ユースケース別の例
-- ユースケース1: ...
+#### 4.2 Examples per major use case
+- Use case 1: ...
   ```javascript
-  // サンプルコード
+  // sample code
   ```
-- ユースケース2: ...
+- Use case 2: ...
   ```javascript
-  // サンプルコード
+  // sample code
   ```
 
-#### 4.3 高度な使い方
-- カスタムオプション活用
-- エラーハンドリング
-- 非同期処理パターン
+#### 4.3 Advanced usage
+- Using custom options
+- Error handling
+- Asynchronous-processing patterns
 
 ---
 
-### 第5章: 設定オプション
+### Chapter 5: Configuration options
 
-<!-- meta: 全オプションの網羅的リスト。 -->
+<!-- meta: exhaustive list of all options. -->
 
-#### 5.1 グローバル設定
-| オプション | 型 | デフォルト | 説明 |
+#### 5.1 Global configuration
+| Option | Type | Default | Description |
 |----------|----|----------|------|
-| `host` | string | `localhost` | 接続先ホスト |
-| `timeout` | number | `5000` | タイムアウト(ms) |
-| `retries` | number | `3` | リトライ回数 |
+| `host` | string | `localhost` | Target host |
+| `timeout` | number | `5000` | Timeout (ms) |
+| `retries` | number | `3` | Retry count |
 | ... | ... | ... | ... |
 
-#### 5.2 機能別オプション
-- 各機能の詳細オプション
-- 組み合わせ可能性
+#### 5.2 Per-feature options
+- Detailed options per feature
+- Combinability
 
-#### 5.3 環境変数による設定
-- 設定可能な環境変数一覧
-- 優先順位(コード > 環境変数 > デフォルト)
+#### 5.3 Configuration via environment variables
+- List of available environment variables
+- Precedence order (code > env vars > defaults)
 
 ---
 
-### 第6章: 互換性
+### Chapter 6: Compatibility
 
-<!-- meta: 動作保証範囲と依存関係。 -->
+<!-- meta: supported runtimes and dependencies. -->
 
-#### 6.1 対応言語バージョン
-| 言語 / ランタイム | 対応バージョン | サポート状況 |
+#### 6.1 Supported language versions
+| Language / runtime | Supported versions | Support status |
 |----------------|--------------|------------|
-| Node.js | 18 LTS, 20 LTS | アクティブ |
-| Node.js | 16 | メンテナンスのみ |
+| Node.js | 18 LTS, 20 LTS | active |
+| Node.js | 16 | maintenance only |
 | ... | ... | ... |
 
-#### 6.2 依存ライブラリ
-| ライブラリ | バージョン | 用途 | 必須/任意 |
+#### 6.2 Dependencies
+| Library | Version | Purpose | Required / optional |
 |----------|----------|------|----------|
-| lodash | ^4.17.0 | ユーティリティ | 必須 |
+| lodash | ^4.17.0 | utility | required |
 | ... | ... | ... | ... |
 
-#### 6.3 ピア依存
-- ピア依存ライブラリ
-- 利用者プロジェクトに要求するバージョン
+#### 6.3 Peer dependencies
+- Peer-dependency libraries
+- Version ranges required of the consuming project
 
-#### 6.4 互換性マトリクス
-- 主要組み合わせの動作確認状況
-- 既知の非互換組み合わせ
-
----
-
-### 第7章: 拡張ポイント / プラグイン機構
-
-<!-- meta: 利用者が拡張するための仕様。 -->
-
-#### 7.1 拡張ポイント一覧
-- フック / コールバック
-- ミドルウェア
-- カスタムプロバイダ
-
-#### 7.2 プラグインAPI
-- プラグイン定義インターフェース
-- プラグインのライフサイクル
-- プラグイン間の依存
-
-#### 7.3 既存プラグイン
-- 公式プラグイン
-- 著名なサードパーティプラグイン
+#### 6.4 Compatibility matrix
+- Verified status for major combinations
+- Known incompatible combinations
 
 ---
 
-### 第8章: マイグレーションガイド
+### Chapter 7: Extension points / plugin system
 
-<!-- meta: 過去バージョンからの移行手順。 -->
+<!-- meta: how consumers extend the library. -->
 
-#### 8.1 v1.x → v2.x マイグレーション
+#### 7.1 List of extension points
+- Hooks / callbacks
+- Middleware
+- Custom providers
 
-##### 破壊的変更
-- 削除されたAPI
-- シグネチャ変更
-- デフォルト値変更
+#### 7.2 Plugin API
+- Plugin-definition interface
+- Plugin lifecycle
+- Inter-plugin dependencies
 
-##### マイグレーション手順
-- ステップバイステップ手順
-- 自動マイグレーションツール(あれば)
+#### 7.3 Existing plugins
+- Official plugins
+- Notable third-party plugins
 
-##### コード例
+---
+
+### Chapter 8: Migration guide
+
+<!-- meta: migration steps from past versions. -->
+
+#### 8.1 Migration from v1.x to v2.x
+
+##### Breaking changes
+- Removed APIs
+- Signature changes
+- Default-value changes
+
+##### Migration steps
+- Step-by-step procedure
+- Automated migration tool (if any)
+
+##### Code examples
 ```javascript
 // Before (v1.x)
 client.connect({ url: 'localhost' });
@@ -218,58 +218,58 @@ client.connect({ url: 'localhost' });
 client.connect({ host: 'localhost' });
 ```
 
-#### 8.2 v0.x → v1.x マイグレーション
-- (同様に記述)
+#### 8.2 Migration from v0.x to v1.x
+- (Same shape as above)
 
 ---
 
-### 第9章: 内部構造(オプショナル)
+### Chapter 9: Internal structure (optional)
 
-<!-- meta: ライブラリ内部のアーキテクチャ。コントリビュータ向け。 -->
+<!-- meta: internal architecture of the library. For contributors. -->
 
-#### 9.1 ディレクトリ構造
-- 主要ディレクトリと責務
+#### 9.1 Directory structure
+- Main directories and their responsibilities
 
-#### 9.2 主要クラス / モジュール
-- 内部の主要構成要素
-- クラス図(必要に応じて)
+#### 9.2 Major classes / modules
+- Internal building blocks
+- Class diagram (when relevant)
 
-#### 9.3 ビルド・テスト
-- ビルドコマンド
-- テスト実行コマンド
-- リリースプロセス
-
----
-
-### 第10章: 既知の制約と未確定事項
-
-<!-- meta: 仕様書の信頼性担保。 -->
-
-#### 10.1 既知の制約
-- 性能上限
-- 既知のバグ / 回避策
-- プラットフォーム別の差異
-
-#### 10.2 未確定事項
-- Question Bank の `abandoned` エントリをここに記載
+#### 9.3 Build and test
+- Build commands
+- Test commands
+- Release process
 
 ---
 
-## 章立てのカスタマイズ指針
+### Chapter 10: Known constraints and unresolved items
 
-### CLI ツールも含む場合
-- 第3章に「CLI コマンド一覧」節を追加
-- 第4章に「CLI 利用例」節を追加
+<!-- meta: spec credibility safeguard. -->
 
-### TypeScript型定義が重要な場合
-- 第3章に「TypeScript 型定義」節を追加
-- ジェネリクス・条件型の使い方を詳述
+#### 10.1 Known constraints
+- Performance ceilings
+- Known bugs / workarounds
+- Per-platform differences
 
-### マルチパッケージ(モノレポ)の場合
-- 第3章をパッケージ別に分割
-- パッケージ間の依存関係を別章で記述
+#### 10.2 Unresolved items
+- Place the `abandoned` entries from the Question Bank here
 
-### 新規ライブラリ(マイグレーションガイド不要)の場合
-- 第8章は省略 or 「将来のマイグレーション方針」のみ記述
+---
 
-カスタマイズはPhase 1のテンプレート選定後、利用者との対話で確定する。
+## Customisation guidance
+
+### Library also ships a CLI tool
+- Add a "CLI command list" section to Chapter 3.
+- Add a "CLI usage example" section to Chapter 4.
+
+### TypeScript type definitions matter
+- Add a "TypeScript type definitions" section to Chapter 3.
+- Document generics and conditional types.
+
+### Multi-package (monorepo)
+- Split Chapter 3 per package.
+- Describe inter-package dependencies in a separate chapter.
+
+### Brand-new library (no migration guide needed)
+- Omit Chapter 8, or use it to describe "future migration policy" only.
+
+Customisation is finalised in dialogue with the user after Phase 1 template selection.

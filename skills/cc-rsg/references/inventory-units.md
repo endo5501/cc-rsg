@@ -1,79 +1,79 @@
 # Inventory Units Reference
 
-Phase 2でインベントリ抽出を行う際の、言語・フレームワーク別の典型単位定義集。
+A catalogue of typical inventory units per language/framework, used during inventory extraction in Phase 2.
 
-このドキュメントは、対象コードベースから「何を全件列挙すべきか」をClaudeが判断するための参照ドキュメントである。Phase 4のインベントリベース検証で「全件カバー」を確認する基準となる。
+This document is the reference Claude consults to decide "what to enumerate exhaustively" from the target codebase. It becomes the basis for the "everything covered" check in Phase 4 inventory-based verification.
 
 <!--
-ファイル拡張ガイド:
-- 言語追加: ## {言語名} セクションを追加
-- フレームワーク固有(L2): 該当言語セクション内に ### {フレームワーク名} 固有 節を追加
-- 撤退ライン: 本ファイルが800行を超えた場合、パターンB(言語/フレームワーク2階層構造への分割)への移行を検討すること
+Extension guide:
+- Add a language → add a `## {language name}` section.
+- Framework-specific (L2) → add a `### {framework name}` subsection inside the relevant language section.
+- Trigger threshold: if this file exceeds 800 lines, consider migration to pattern B (split into language / framework two-level structure).
 -->
 
-## 目次
+## Table of contents
 
-- [共通の考え方](#共通の考え方)
+- [Common concepts](#common-concepts)
 - [PHP](#php)
 - [COBOL](#cobol)
 - [Python](#python)
-  - [Flask 固有](#flask-固有)
-  - [FastAPI 固有](#fastapi-固有)
+  - [Flask specifics](#flask-specifics)
+  - [FastAPI specifics](#fastapi-specifics)
 - [Java](#java)
 - [JavaScript / TypeScript](#javascript--typescript)
-  - [Next.js 固有(App Router / Pages Router)](#nextjs-固有app-router--pages-router)
-  - [Expo / React Native 固有](#expo--react-native-固有)
+  - [Next.js specifics (App Router / Pages Router)](#nextjs-specifics-app-router--pages-router)
+  - [Expo / React Native specifics](#expo--react-native-specifics)
 - [C#](#c)
-- [SQL / データベーススキーマ](#sql--データベーススキーマ)
-- [言語選定が悩ましいケース](#言語選定が悩ましいケース)
-- [カスタマイズと拡張](#カスタマイズと拡張)
-- [抽出時のClaudeへの指示要約](#抽出時のclaudeへの指示要約)
+- [SQL / database schema](#sql--database-schema)
+- [When language choice is ambiguous](#when-language-choice-is-ambiguous)
+- [Customisation and extension](#customisation-and-extension)
+- [Instruction summary for Claude during extraction](#instruction-summary-for-claude-during-extraction)
 
 ---
 
-## 共通の考え方
+## Common concepts
 
-インベントリ単位は以下3階層で考える。
+Inventory units exist in 3 tiers:
 
-1. **マクロ単位**: モジュール、パッケージ、サービス
-2. **ミドル単位**: クラス、関数、エンドポイント、ジョブ
-3. **マイクロ単位**: メソッド、フィールド、設定値
+1. **Macro units**: modules, packages, services
+2. **Middle units**: classes, functions, endpoints, jobs
+3. **Micro units**: methods, fields, configuration values
 
-仕様書の粒度希望(Phase 0で確定)に応じて、対象とする階層を変える。
+The tier you target depends on the granularity preference fixed in Phase 0.
 
-- **高レベル概要**: マクロ単位のみ
-- **中粒度**: マクロ + ミドル単位
-- **詳細**: 全階層
+- **High-level overview**: macro units only
+- **Medium**: macro + middle
+- **Detailed**: all tiers
 
 ---
 
 ## PHP
 
-### マクロ単位
-- Composerパッケージ(`composer.json`の`name`)
-- 名前空間(PSR-4)
-- フレームワーク別モジュール(Laravelの`app/Modules/`, Symfonyの`src/Bundle/`等)
+### Macro units
+- Composer packages (`name` in `composer.json`)
+- Namespaces (PSR-4)
+- Framework-specific modules (Laravel's `app/Modules/`, Symfony's `src/Bundle/`, etc.)
 
-### ミドル単位
-- クラス(`class`)、トレイト(`trait`)、インターフェース(`interface`)
-- ルート定義(`routes/web.php`, `routes/api.php`、Symfony attributeルート、Slim app->getなど)
-- アーティザンコマンド(Laravel `app/Console/Commands/`)
-- イベントリスナー、ジョブ、ミドルウェア
+### Middle units
+- Classes (`class`), traits (`trait`), interfaces (`interface`)
+- Route definitions (`routes/web.php`, `routes/api.php`, Symfony attribute routes, Slim `app->get`, etc.)
+- Artisan commands (Laravel `app/Console/Commands/`)
+- Event listeners, jobs, middleware
 
-### マイクロ単位
-- パブリックメソッド
-- Eloquent / Doctrineエンティティのプロパティ
-- 設定ファイルのキー(`config/*.php`)
+### Micro units
+- Public methods
+- Eloquent / Doctrine entity properties
+- Configuration-file keys (`config/*.php`)
 
-### 抽出例
+### Extraction examples
 ```bash
-# クラス列挙
+# Enumerate classes
 grep -rEn "^(abstract |final )?class [A-Z]" src/ --include="*.php"
 
-# ルート列挙(Laravel)
+# Enumerate routes (Laravel)
 grep -rEn "Route::(get|post|put|patch|delete|any)" routes/ --include="*.php"
 
-# Artisanコマンド列挙
+# Enumerate Artisan commands
 grep -rEn "protected \\\$signature" app/Console/Commands/ --include="*.php"
 ```
 
@@ -81,198 +81,198 @@ grep -rEn "protected \\\$signature" app/Console/Commands/ --include="*.php"
 
 ## COBOL
 
-### マクロ単位
+### Macro units
 - COPYBOOK
-- ジョブ(JCLステップ)
+- Jobs (JCL steps)
 
-### ミドル単位
+### Middle units
 - PROGRAM-ID
 - SECTION
 - PARAGRAPH
-- CALL対象プログラム(動的・静的)
+- CALL targets (dynamic and static)
 
-### マイクロ単位
-- 01レベル項目
-- ファイル定義(SELECT / FD)
-- DB呼び出し(EXEC SQL / EXEC CICS)
+### Micro units
+- 01-level items
+- File definitions (SELECT / FD)
+- DB invocations (EXEC SQL / EXEC CICS)
 
-### 抽出例
+### Extraction examples
 ```bash
-# PROGRAM-ID列挙
+# Enumerate PROGRAM-ID
 grep -rEn "^[ ]*PROGRAM-ID\\." src/ --include="*.cob" --include="*.cbl"
 
-# SECTION列挙
+# Enumerate SECTION
 grep -rEn "^[ 0-9]+[A-Z0-9-]+ +SECTION\\." src/ --include="*.cob"
 
-# CALL文列挙
+# Enumerate CALL statements
 grep -rEn "^[ ]*CALL +'" src/ --include="*.cob"
 ```
 
-### COBOL固有の注意
-- カラム位置(7列目以降が有効領域、1〜6列はシーケンス番号)に依存する
-- COPYBOOK展開後の論理構造と物理ファイルの対応を別途記録する必要がある
-- JCL(Job Control Language)はCOBOLとは別言語だが、ジョブ起動条件として仕様書に必須
+### COBOL-specific cautions
+- Column position matters (columns 7+ are the effective area; columns 1-6 are sequence numbers).
+- The mapping between the logical structure after COPYBOOK expansion and physical files must be recorded separately.
+- JCL (Job Control Language) is a separate language from COBOL but is required in the spec because it drives job-trigger conditions.
 
 ---
 
 ## Python
 
-### マクロ単位
-- パッケージ(`__init__.py`を持つディレクトリ)
-- モジュール(`.py`ファイル)
-- インストール可能パッケージ(`pyproject.toml` / `setup.py`)
+### Macro units
+- Packages (directories that contain `__init__.py`)
+- Modules (`.py` files)
+- Installable packages (`pyproject.toml` / `setup.py`)
 
-### ミドル単位
-- クラス(`class`)
-- トップレベル関数(`def`)
-- FastAPI / Flask / Django のエンドポイント
-- Celeryタスク(`@app.task`)
-- Click / argparseコマンド
+### Middle units
+- Classes (`class`)
+- Top-level functions (`def`)
+- FastAPI / Flask / Django endpoints
+- Celery tasks (`@app.task`)
+- Click / argparse commands
 
-### マイクロ単位
-- パブリックメソッド
-- Pydanticモデル / dataclassのフィールド
-- 設定キー(`settings.py`、環境変数)
+### Micro units
+- Public methods
+- Pydantic model / dataclass fields
+- Configuration keys (`settings.py`, environment variables)
 
-### 抽出例
+### Extraction examples
 ```bash
-# クラス列挙
+# Enumerate classes
 grep -rEn "^class " --include="*.py" src/
 
-# FastAPIエンドポイント
+# FastAPI endpoints
 grep -rEn "@(app|router)\\.(get|post|put|patch|delete)" --include="*.py"
 
-# Djangoモデル
+# Django models
 grep -rEn "^class .*\\(.*models\\.Model.*\\):" --include="*.py"
 ```
 
-### Flask 固有
+### Flask specifics
 
-Flask は WSGI アプリケーション、Blueprint によるモジュール分割、デコレータベースのルート定義が特徴。仕様書化では Blueprint 単位での章分割が有効。
+Flask is a WSGI application defined by Blueprint-based module decomposition and decorator-based route definitions. Per-Blueprint chapter splits work well in the spec.
 
-#### マクロ単位
-- アプリケーションファクトリ関数(`def create_app(): ...`)
-- Blueprint(モジュール単位の機能群)
-- Flask 拡張(Flask-SQLAlchemy, Flask-Login, Flask-Migrate 等)
+#### Macro units
+- Application-factory function (`def create_app(): ...`)
+- Blueprints (per-module feature groupings)
+- Flask extensions (Flask-SQLAlchemy, Flask-Login, Flask-Migrate, etc.)
 
-#### ミドル単位
-- View function(`@app.route` / `@bp.route` / `@app.get` 等)
-- Class-based view(`MethodView` 継承クラス)
-- Hook(`@app.before_request`, `@app.after_request`, `@app.errorhandler`)
-- Jinja2 テンプレート(`templates/*.html`)
-- Flask-WTF Form(`FlaskForm` 継承クラス)
-- Flask-SQLAlchemy Model(`db.Model` 継承クラス)
-- CLI コマンド(`@app.cli.command()` / `@bp.cli.command()`)
+#### Middle units
+- View functions (`@app.route` / `@bp.route` / `@app.get`, etc.)
+- Class-based views (subclasses of `MethodView`)
+- Hooks (`@app.before_request`, `@app.after_request`, `@app.errorhandler`)
+- Jinja2 templates (`templates/*.html`)
+- Flask-WTF forms (subclasses of `FlaskForm`)
+- Flask-SQLAlchemy models (subclasses of `db.Model`)
+- CLI commands (`@app.cli.command()` / `@bp.cli.command()`)
 
-#### マイクロ単位
-- ルート別の URL パラメータ・クエリパラメータ
-- `app.config[...]` の設定キー
-- Jinja2 マクロ・フィルタ
+#### Micro units
+- URL parameters and query parameters per route
+- `app.config[...]` configuration keys
+- Jinja2 macros and filters
 
-#### 抽出例
+#### Extraction examples
 ```bash
-# Blueprint 列挙
+# Enumerate Blueprints
 grep -rEn "Blueprint\\(['\"]" --include="*.py" src/
 
-# ルート定義(app / bp / *_bp)
+# Route definitions (app / bp / *_bp)
 grep -rEn "@([a-zA-Z_]+)\\.(route|get|post|put|patch|delete)\\(" --include="*.py" src/
 
-# Hook 列挙
+# Enumerate hooks
 grep -rEn "@([a-zA-Z_]+)\\.(before_request|after_request|teardown_request|errorhandler|context_processor)" --include="*.py" src/
 
-# Jinja2 テンプレート
+# Jinja2 templates
 find templates/ -name "*.html" 2>/dev/null
 
-# CLI コマンド
+# CLI commands
 grep -rEn "@([a-zA-Z_]+)\\.cli\\.command\\(" --include="*.py" src/
 ```
 
-#### Flask 固有の注意
-- Blueprint 名は仕様書の章 ID として再利用しやすい
-- `before_request` / `after_request` は隠れた業務ロジックを含むため、必ず章に含めること
-- アプリケーションファクトリパターンでは設定の差(`config.from_envvar` 等)を運用設定章に明記する
+#### Flask-specific cautions
+- Blueprint names are easy to reuse as chapter IDs in the spec.
+- `before_request` / `after_request` often contain hidden business logic — always include them in the chapter.
+- In the application-factory pattern, configuration variants (`config.from_envvar`, etc.) should be called out in the operations chapter.
 
 ---
 
-### FastAPI 固有
+### FastAPI specifics
 
-FastAPI は型ヒント駆動の ASGI フレームワーク。Pydantic スキーマと依存性注入(DI)が中心概念で、これらを欠いた仕様書は不完全。
+FastAPI is a type-hint-driven ASGI framework. Pydantic schemas and dependency injection (DI) are central concepts; a spec that omits them is incomplete.
 
-#### マクロ単位
-- FastAPI アプリ(`FastAPI()` インスタンス)
-- APIRouter(機能単位のルーター)
-- Lifespan(`@asynccontextmanager` / `lifespan` パラメータ)
+#### Macro units
+- FastAPI app (`FastAPI()` instances)
+- APIRouter (per-feature routers)
+- Lifespan (`@asynccontextmanager` / `lifespan` parameter)
 
-#### ミドル単位
-- エンドポイント(`@app.get`, `@router.post` 等、WebSocket 含む)
-- Pydantic スキーマ(`BaseModel` 継承クラス、リクエスト / レスポンス両方)
-- Dependency(`Depends(...)` で注入される関数 / クラス)
-- Background Task(`BackgroundTasks` 経由で実行される関数)
-- Middleware(`@app.middleware("http")` / `app.add_middleware(...)`)
-- Exception handler(`@app.exception_handler(...)`)
-- Security scheme(`OAuth2PasswordBearer`, `APIKeyHeader` 等)
+#### Middle units
+- Endpoints (`@app.get`, `@router.post`, etc., including WebSocket)
+- Pydantic schemas (subclasses of `BaseModel`, both request and response)
+- Dependencies (functions / classes injected via `Depends(...)`)
+- Background tasks (functions invoked via `BackgroundTasks`)
+- Middleware (`@app.middleware("http")` / `app.add_middleware(...)`)
+- Exception handlers (`@app.exception_handler(...)`)
+- Security schemes (`OAuth2PasswordBearer`, `APIKeyHeader`, etc.)
 
-#### マイクロ単位
-- パスパラメータ・クエリパラメータの型と制約(`Query(...)`, `Path(...)`)
-- Pydantic フィールドのバリデーション(`Field(...)`, `field_validator`)
-- レスポンスモデル(`response_model=...`)とステータスコード(`status_code=...`)
+#### Micro units
+- Path / query parameter types and constraints (`Query(...)`, `Path(...)`)
+- Pydantic field validations (`Field(...)`, `field_validator`)
+- Response models (`response_model=...`) and status codes (`status_code=...`)
 
-#### 抽出例
+#### Extraction examples
 ```bash
-# APIRouter 定義
+# APIRouter definitions
 grep -rEn "APIRouter\\(" --include="*.py" src/
 
-# エンドポイント(REST + WebSocket)
+# Endpoints (REST + WebSocket)
 grep -rEn "@([a-zA-Z_]+)\\.(get|post|put|patch|delete|head|options|websocket)\\(" --include="*.py" src/
 
-# Pydantic スキーマ
+# Pydantic schemas
 grep -rEn "^class .*\\((BaseModel|RootModel)\\b" --include="*.py" src/
 
-# Dependency 関数
+# Dependency functions
 grep -rEn "Depends\\(" --include="*.py" src/
 
-# Exception handler
+# Exception handlers
 grep -rEn "@([a-zA-Z_]+)\\.exception_handler\\(" --include="*.py" src/
 
-# Middleware 登録
+# Middleware registration
 grep -rEn "@([a-zA-Z_]+)\\.middleware\\(|add_middleware\\(" --include="*.py" src/
 ```
 
-#### FastAPI 固有の注意
-- レスポンス Pydantic スキーマは API 仕様の core であり、テンプレート選定が `api-service` の場合は必ず章として独立させる
-- `Depends(...)` で注入される関数は「権限チェック」「DB セッション取得」「外部 API クライアント生成」など重要ロジックを内包することが多い。Question Bank の `architecture_decision` カテゴリで疑問化することを検討
-- OpenAPI スキーマ(`/openapi.json`)が自動生成されるため、可能なら起動時に取得して `recon-report.md` に添付すると効率的
+#### FastAPI-specific cautions
+- Response Pydantic schemas are the core of the API spec. When the chosen template is `api-service`, always promote them to a dedicated chapter.
+- Functions injected via `Depends(...)` often contain crucial logic (authorisation, DB session acquisition, external API client construction, etc.). Consider raising questions in the `architecture_decision` category of the Question Bank.
+- OpenAPI schema (`/openapi.json`) is generated automatically — when possible, fetch it at startup and attach to `recon-report.md`.
 
 ---
 
 ## Java
 
-### マクロ単位
-- パッケージ(`com.example.foo`)
-- Mavenモジュール(`pom.xml`)
-- Springプロファイル / Bundle / OSGi モジュール
+### Macro units
+- Packages (`com.example.foo`)
+- Maven modules (`pom.xml`)
+- Spring profiles / Bundle / OSGi modules
 
-### ミドル単位
-- クラス(`class`, `interface`, `enum`, `record`)
+### Middle units
+- Classes (`class`, `interface`, `enum`, `record`)
 - Spring `@Controller`, `@Service`, `@Repository`, `@Component`
-- エンドポイント(`@RequestMapping`, `@GetMapping`等)
-- バッチジョブ(Spring Batch `Job`, `Step`)
-- スケジュールタスク(`@Scheduled`)
+- Endpoints (`@RequestMapping`, `@GetMapping`, etc.)
+- Batch jobs (Spring Batch `Job`, `Step`)
+- Scheduled tasks (`@Scheduled`)
 
-### マイクロ単位
-- パブリックメソッド
-- JPA Entity フィールド
-- 設定プロパティ(`application.yml` / `application.properties`)
+### Micro units
+- Public methods
+- JPA entity fields
+- Configuration properties (`application.yml` / `application.properties`)
 
-### 抽出例
+### Extraction examples
 ```bash
-# クラス列挙
+# Enumerate classes
 grep -rEn "^(public |abstract |final )*(class|interface|enum|record) " src/ --include="*.java"
 
-# Spring エンドポイント
+# Spring endpoints
 grep -rEn "@(Get|Post|Put|Patch|Delete|Request)Mapping" src/ --include="*.java"
 
-# JPAエンティティ
+# JPA entities
 grep -rEn "@Entity" src/ --include="*.java"
 ```
 
@@ -280,354 +280,354 @@ grep -rEn "@Entity" src/ --include="*.java"
 
 ## JavaScript / TypeScript
 
-### マクロ単位
-- npmパッケージ(`package.json`の`name`)
-- ワークスペース(monorepo: pnpm workspace, turborepo)
-- フロントエンド: ページ、ルート(Next.js `app/`, `pages/`)
-- バックエンド: モジュール(NestJS)
+### Macro units
+- npm packages (`name` in `package.json`)
+- Workspaces (monorepo: pnpm workspace, turborepo)
+- Frontend: pages, routes (Next.js `app/`, `pages/`)
+- Backend: modules (NestJS)
 
-### ミドル単位
-- エクスポートされた関数 / クラス
-- Reactコンポーネント、Vueコンポーネント
-- Express / Fastify / Hono のルートハンドラ
+### Middle units
+- Exported functions / classes
+- React components, Vue components
+- Route handlers for Express / Fastify / Hono
 - NestJS Controller / Service / Module
-- バックグラウンドジョブ(BullMQ, Agenda)
+- Background jobs (BullMQ, Agenda)
 
-### マイクロ単位
-- パブリックメソッド
-- Zod / Yup / TypeScript型定義
-- 環境変数
+### Micro units
+- Public methods
+- Zod / Yup / TypeScript type definitions
+- Environment variables
 
-### 抽出例
+### Extraction examples
 ```bash
-# エクスポート関数 / クラス
+# Exported functions / classes
 grep -rEn "^export (default )?(async )?(function|class|const)" --include="*.ts" --include="*.tsx" --include="*.js" src/
 
-# Express ルート
+# Express routes
 grep -rEn "(app|router)\\.(get|post|put|patch|delete)\\(" --include="*.ts" --include="*.js" src/
 
-# Reactコンポーネント(関数コンポーネント)
+# React components (function components)
 grep -rEn "^export (default )?function [A-Z]" --include="*.tsx" --include="*.jsx" src/
 ```
 
-### Next.js 固有(App Router / Pages Router)
+### Next.js specifics (App Router / Pages Router)
 
-Next.js は規約ベース(convention-over-configuration)のフレームワークで、ファイル名そのものがインベントリ単位になる。App Router(13+)と Pages Router で構造が異なるため、両者を区別すること。
+Next.js is a convention-over-configuration framework: file names themselves become inventory units. App Router (13+) and Pages Router have different structures — keep them separate.
 
-#### マクロ単位
-- `app/` ディレクトリ(App Router 採用プロジェクト)
-- `pages/` ディレクトリ(Pages Router 採用プロジェクト、`pages/api/` は API エンドポイント)
-- Route Group(`(group_name)` 形式のディレクトリ、URL に現れない論理グループ)
-- Parallel Route(`@slot_name`)、Intercepting Route(`(.)`, `(..)`, `(...)`)
+#### Macro units
+- `app/` directory (App Router projects)
+- `pages/` directory (Pages Router projects; `pages/api/` is API endpoints)
+- Route Group (directories of the form `(group_name)` — logical groupings that do not appear in the URL)
+- Parallel Routes (`@slot_name`), Intercepting Routes (`(.)`, `(..)`, `(...)`)
 
-#### ミドル単位(App Router)
-- ページ(`app/**/page.tsx` / `page.ts`)
-- レイアウト(`app/**/layout.tsx`)
-- ローディング UI(`app/**/loading.tsx`)
-- エラー境界(`app/**/error.tsx` / `global-error.tsx`)
-- Not Found(`app/**/not-found.tsx`)
-- API ルート(`app/**/route.ts` — Route Handler)
-- Server Action(`'use server'` を含むファイル / 関数)
-- Server Component / Client Component の境界(`'use client'` ディレクティブ)
-- Middleware(`middleware.ts`(プロジェクトルート))
-- インストルメンテーション(`instrumentation.ts`)
+#### Middle units (App Router)
+- Pages (`app/**/page.tsx` / `page.ts`)
+- Layouts (`app/**/layout.tsx`)
+- Loading UI (`app/**/loading.tsx`)
+- Error boundaries (`app/**/error.tsx` / `global-error.tsx`)
+- Not Found (`app/**/not-found.tsx`)
+- API routes (`app/**/route.ts` — Route Handler)
+- Server Actions (files / functions that include `'use server'`)
+- Server Component / Client Component boundary (`'use client'` directive)
+- Middleware (`middleware.ts` at the project root)
+- Instrumentation (`instrumentation.ts`)
 
-#### ミドル単位(Pages Router)
-- ページ(`pages/**/*.tsx`)
-- API エンドポイント(`pages/api/**/*.ts`)
-- `_app.tsx`, `_document.tsx`, `_error.tsx`(特殊ファイル)
-- `getStaticProps` / `getStaticPaths` / `getServerSideProps` を含むページ
+#### Middle units (Pages Router)
+- Pages (`pages/**/*.tsx`)
+- API endpoints (`pages/api/**/*.ts`)
+- Special files: `_app.tsx`, `_document.tsx`, `_error.tsx`
+- Pages containing `getStaticProps` / `getStaticPaths` / `getServerSideProps`
 
-#### マイクロ単位
-- 動的ルートセグメント(`[id]`, `[...slug]`, `[[...slug]]`)
-- ルートメタデータ(`generateMetadata`, `metadata` エクスポート)
-- 設定ファイル(`next.config.js` / `next.config.mjs`)
-- 環境変数(`NEXT_PUBLIC_*` で始まるものはクライアント露出)
+#### Micro units
+- Dynamic route segments (`[id]`, `[...slug]`, `[[...slug]]`)
+- Route metadata (`generateMetadata`, `metadata` exports)
+- Config files (`next.config.js` / `next.config.mjs`)
+- Environment variables (those starting with `NEXT_PUBLIC_` are exposed to the client)
 
-#### 抽出例
+#### Extraction examples
 ```bash
-# App Router ページ
+# App Router pages
 find app -name "page.tsx" -o -name "page.ts" -o -name "page.jsx" -o -name "page.js" 2>/dev/null
 
-# App Router API ルート
+# App Router API routes
 find app -name "route.ts" -o -name "route.js" 2>/dev/null
 
-# Pages Router ページ(_を除く)
+# Pages Router pages (excluding _ files)
 find pages -name "*.tsx" -o -name "*.ts" 2>/dev/null | grep -vE "/(_app|_document|_error)\\."
 
 # Pages Router API
 find pages/api -type f 2>/dev/null
 
-# Server Action 含有ファイル
+# Files containing a Server Action
 grep -rEn "^[\"']use server[\"']" --include="*.ts" --include="*.tsx" .
 
-# Client Component 宣言
+# Client Component declarations
 grep -rEn "^[\"']use client[\"']" --include="*.ts" --include="*.tsx" app/
 
 # Middleware
 ls middleware.ts middleware.js 2>/dev/null
 ```
 
-#### Next.js 固有の注意
-- **App Router と Pages Router の混在**は実プロジェクトで頻発する。両方検出された場合は仕様書で章を分けること
-- Server Action はソースコード上では普通の関数だが、ネットワーク境界を越える。**API エンドポイントとして列挙する**こと
-- `'use client'` ディレクティブの有無で実行環境が変わる。セキュリティ・パフォーマンス章で言及対象
-- `next.config.js` の `experimental` セクションは将来不安定性の根拠になるため必ず仕様書に明記
+#### Next.js-specific cautions
+- **Mixed App Router and Pages Router** is common in real projects. When both are detected, split chapters in the spec.
+- Server Actions look like ordinary functions in source but cross the network boundary. **Enumerate them as API endpoints.**
+- The presence/absence of `'use client'` changes the execution environment. Reference it in the security / performance chapters.
+- The `experimental` section of `next.config.js` is a strong basis for future instability — always state it in the spec.
 
 ---
 
-### Expo / React Native 固有
+### Expo / React Native specifics
 
-Expo / React Native は **モバイルアプリ** が出力対象。Web アプリと異なる単位(画面、ナビゲーション、ネイティブモジュール、ビルド構成)が中心になる。テンプレートは `web-app.md` ではなく将来追加予定の `mobile-app.md`(または `web-app.md` をモバイル向けカスタマイズ)を選定すること。
+Expo / React Native targets **mobile apps**. Different units (screens, navigation, native modules, build config) dominate compared to a web app. Choose a future `mobile-app.md` template (or a mobile customisation of `web-app.md`) instead of using `web-app.md` directly.
 
-#### マクロ単位
-- アプリエントリ(`App.tsx` / `app/_layout.tsx`(Expo Router))
-- ナビゲータ階層(Stack / Tab / Drawer の入れ子構造)
-- プラットフォーム別ディレクトリ(`android/`, `ios/`、Bare Workflow の場合)
+#### Macro units
+- App entry (`App.tsx` / `app/_layout.tsx` for Expo Router)
+- Navigator hierarchy (nested Stack / Tab / Drawer)
+- Platform directories (`android/`, `ios/` in the Bare Workflow)
 
-#### ミドル単位
-- 画面(Screen)
-  - `screens/*.tsx` / `screens/**/*Screen.tsx`(伝統構造)
-  - `app/**/*.tsx`(Expo Router 採用、Next.js App Router に類似)
-- ナビゲータ定義(`createNativeStackNavigator`, `createBottomTabNavigator`, `createDrawerNavigator`)
-- カスタムフック(`hooks/use*.ts`)
-- ネイティブモジュール参照(`NativeModules.XXX`, Expo Modules `expo-camera` 等)
-- バックグラウンドタスク(`expo-background-fetch`, `expo-task-manager`)
-- ストア / 永続化(`AsyncStorage`, `SecureStore`, MMKV, Realm)
+#### Middle units
+- Screens
+  - `screens/*.tsx` / `screens/**/*Screen.tsx` (traditional structure)
+  - `app/**/*.tsx` (Expo Router; similar to Next.js App Router)
+- Navigator definitions (`createNativeStackNavigator`, `createBottomTabNavigator`, `createDrawerNavigator`)
+- Custom hooks (`hooks/use*.ts`)
+- Native module references (`NativeModules.XXX`, Expo Modules such as `expo-camera`)
+- Background tasks (`expo-background-fetch`, `expo-task-manager`)
+- Storage / persistence (`AsyncStorage`, `SecureStore`, MMKV, Realm)
 
-#### マイクロ単位
-- 画面遷移パラメータの型(`RootStackParamList`)
-- パーミッション宣言(`app.json` の `permissions` / `infoPlist` / `androidManifest`)
-- 環境変数(`EXPO_PUBLIC_*`、`Constants.expoConfig`)
+#### Micro units
+- Screen navigation parameter types (`RootStackParamList`)
+- Permission declarations (`permissions` / `infoPlist` / `androidManifest` in `app.json`)
+- Environment variables (`EXPO_PUBLIC_*`, `Constants.expoConfig`)
 
-#### ビルド・配信構成
-- `app.json` / `app.config.ts` / `app.config.js`(アプリメタデータ、ビルド設定)
-- `eas.json`(EAS Build / Submit 設定、開発 / プレビュー / 本番プロファイル)
-- `package.json` の `scripts`(`expo start`, `expo run:ios`, `expo prebuild` 等)
-- `metro.config.js`(バンドラ設定)
-- `babel.config.js`(プラグイン構成、特に `react-native-reanimated/plugin` 等)
+#### Build / distribution configuration
+- `app.json` / `app.config.ts` / `app.config.js` (app metadata, build configuration)
+- `eas.json` (EAS Build / Submit configuration; development / preview / production profiles)
+- `package.json` `scripts` (`expo start`, `expo run:ios`, `expo prebuild`, etc.)
+- `metro.config.js` (bundler configuration)
+- `babel.config.js` (plugin composition, especially `react-native-reanimated/plugin`, etc.)
 
-#### 抽出例
+#### Extraction examples
 ```bash
-# 画面ファイル(伝統構造)
+# Screen files (traditional structure)
 find . -path ./node_modules -prune -o -name "*Screen.tsx" -print 2>/dev/null
 
-# Expo Router 画面(app/ 配下)
+# Expo Router screens (under app/)
 find app -name "*.tsx" -not -name "_*" 2>/dev/null
 
-# ナビゲータ作成
+# Navigator creation
 grep -rEn "create(NativeStack|BottomTab|Drawer|Material(Top|Bottom)Tab)Navigator" --include="*.tsx" --include="*.ts" .
 
-# Expo Module 利用
+# Expo Module usage
 grep -rEn "from ['\"]expo-[a-z-]+['\"]" --include="*.ts" --include="*.tsx" .
 
-# パーミッション宣言(app.json / app.config.*)
+# Permission declarations (app.json / app.config.*)
 grep -nE "(permissions|infoPlist|androidManifest)" app.json app.config.* 2>/dev/null
 
-# EAS ビルドプロファイル
+# EAS build profiles
 cat eas.json 2>/dev/null | grep -E '"(development|preview|production)"'
 ```
 
-#### Expo / React Native 固有の注意
-- **Managed / Bare Workflow の判別**を最初に行うこと(`android/` `ios/` ディレクトリの有無、または `expo prebuild` の痕跡)。仕様書の構造が大きく変わる
-- ネイティブモジュール(`expo-camera`, `expo-location` 等)は **OS 固有のパーミッション** が必要。仕様書のセキュリティ / 運用要件章で必ず言及
-- `app.json` の `runtimeVersion` と `eas.json` の `channel` 設定は **OTA(Over-The-Air)アップデート** の挙動を決める。バージョニング章で言及
-- **iOS / Android 両プラットフォームで挙動が異なる箇所**(プッシュ通知、バックグラウンド実行、ファイルアクセス)は明示的に章を分けるか節を分けること
-- Web 版(`react-native-web`)を出力する設定の有無を確認(出力する場合は Web アプリ章も追加)
+#### Expo / React Native-specific cautions
+- **Decide Managed vs Bare Workflow first** (presence of `android/` `ios/` directories, or traces of `expo prebuild`). The spec structure changes significantly.
+- Native modules (`expo-camera`, `expo-location`, etc.) require **OS-specific permissions**. Always cover them in the security / operations chapters.
+- `runtimeVersion` in `app.json` and `channel` in `eas.json` decide **OTA (Over-the-Air) update** behaviour. Mention this in the versioning chapter.
+- **Behaviour differences between iOS and Android** (push notifications, background execution, file access) should be split into explicit chapters or sections.
+- Check whether `react-native-web` output is configured (if yes, also add a web-app chapter).
 
 ---
 
 ## C#
 
-### マクロ単位
-- アセンブリ(`.csproj`)
-- 名前空間(`namespace`)
-- ソリューション(`.sln`)
+### Macro units
+- Assemblies (`.csproj`)
+- Namespaces (`namespace`)
+- Solutions (`.sln`)
 
-### ミドル単位
-- クラス(`class`, `interface`, `record`, `struct`)
-- ASP.NET Core Controller / Minimal API エンドポイント
-- ホスト型サービス(`IHostedService`)
-- バックグラウンドワーカー
+### Middle units
+- Classes (`class`, `interface`, `record`, `struct`)
+- ASP.NET Core Controller / Minimal API endpoints
+- Hosted services (`IHostedService`)
+- Background workers
 
-### マイクロ単位
-- パブリックメソッド
-- EF Core エンティティのプロパティ
-- `appsettings.json`の設定キー
+### Micro units
+- Public methods
+- EF Core entity properties
+- Configuration keys in `appsettings.json`
 
-### 抽出例
+### Extraction examples
 ```bash
-# クラス列挙
+# Enumerate classes
 grep -rEn "^[[:space:]]*(public |internal )?(abstract |sealed )?(class|interface|record|struct) " src/ --include="*.cs"
 
-# ASP.NET エンドポイント
+# ASP.NET endpoints
 grep -rEn "\\[Http(Get|Post|Put|Patch|Delete)\\]" src/ --include="*.cs"
 ```
 
 ---
 
-## SQL / データベーススキーマ
+## SQL / database schema
 
-ソースコード本体とは別に、データベーススキーマも仕様書の対象になる。
+Database schemas are part of the spec target alongside the source code itself.
 
-### インベントリ単位
-- テーブル
-- ビュー
-- ストアドプロシージャ / ファンクション
-- トリガ
-- インデックス
-- 外部キー制約
+### Inventory units
+- Tables
+- Views
+- Stored procedures / functions
+- Triggers
+- Indexes
+- Foreign-key constraints
 
-### 抽出方法
-- マイグレーションファイル(Rails, Laravel, Django, Flyway, Liquibase)を解析
-- 本番DBから`information_schema`を読み取る(可能な場合)
-- ER図 / DDLファイルを直接読む
-
----
-
-## 言語選定が悩ましいケース
-
-### 多言語混在リポジトリ
-- 言語ごとに別インベントリを作成し、言語タグを付けて区別する。
-- 例: `inventory.json`の各エントリに`"language": "php"`フィールドを追加。
-
-### DSL / 設定ファイルが本質的
-- Terraformの`.tf`、Kubernetesの`.yaml`、Ansibleのplaybookなど、DSLが主役のプロジェクトでは、これらをミドル単位として扱う。
-- リソース定義(`resource "aws_instance" ...`)、Pod / Service / Deployment、playbookのtaskを単位とする。
-
-### マイクロサービス
-- サービス単位をマクロ単位とし、各サービス内の言語別インベントリをミドル単位以下で展開する。
+### Extraction methods
+- Parse migration files (Rails, Laravel, Django, Flyway, Liquibase)
+- Read `information_schema` from a production DB (when possible)
+- Read ER diagrams / DDL files directly
 
 ---
 
-## カスタマイズと拡張
+## When language choice is ambiguous
 
-利用者が独自の言語 / フレームワーク向けにインベントリ単位を追加したい場合は、このファイルに追記する形で運用する。初版ではUI経由の追加機構は提供しない。
+### Multi-language repository
+- Produce a separate inventory per language and tag each entry with the language.
+- Example: add `"language": "php"` to each entry in `inventory.json`.
 
-将来的には `references/inventory-units-{custom}.md` のような分割を検討する。
+### DSL / configuration files are essential
+- For projects centred on a DSL — Terraform `.tf`, Kubernetes `.yaml`, Ansible playbooks — treat those DSLs as middle units.
+- Resource definitions (`resource "aws_instance" ...`), Pods / Services / Deployments, and playbook tasks become the units.
 
----
-
-## 抽出時のClaudeへの指示要約
-
-1. **まず `scripts/source-map.py --target <root>` を実行する**。これでファイル単位のソースユニット (SRC-NNNN) が自動抽出され、`.cc-rsg/source-map.json` に保存される。
-2. 対象コードベースの主要言語を特定する（`recon-report.md`から）。
-3. 該当言語のセクションを参照し、抽出戦略を立てる。
-4. **source-map.json の units を概念単位にグループ化する**。多対1（複数の SRC → 1 INV）はOK、ただし下記の粒度規定に従う。
-5. 結果を `inventory.json` に保存する。スキーマは SKILL.md の Phase 2 を参照。各 inventory_item には対応する複数の SRC-NNNN を `related_source_ids` フィールドで記録すると Phase 4 検証で利用できる。
-6. 抽出時に検出されたコメントアウト・廃止予定コード・テストコードはタグ付けして区別する（`"deprecated": true` 等）。
+### Microservices
+- Treat each service as a macro unit, and develop the per-language inventory inside each service as middle units and below.
 
 ---
 
-## 粒度規定（必須遵守）
+## Customisation and extension
 
-### 最低件数
+When the user wants to add inventory units for a new language / framework, append to this file. The v1 release does not provide a UI-based addition mechanism.
+
+A future version may split this into `references/inventory-units-{custom}.md`-style files.
+
+---
+
+## Instruction summary for Claude during extraction
+
+1. **First, run `scripts/source-map.py --target <root>`**. This auto-extracts file-level source units (SRC-NNNN) and saves them to `.cc-rsg/source-map.json`.
+2. Identify the target codebase's primary language(s) from `recon-report.md`.
+3. Consult the matching section and plan an extraction strategy.
+4. **Group `source-map.json` units into conceptual units**. Many-to-one (multiple SRC → 1 INV) is acceptable, subject to the granularity rules below.
+5. Save the result to `inventory.json`. Schema lives in SKILL.md's Phase 2 section. For each inventory item, record the corresponding multiple SRC-NNNN in `related_source_ids`; Phase 4 verification uses this.
+6. Tag commented-out / deprecated / test code that you encounter (e.g. `"deprecated": true`).
+
+---
+
+## Granularity rules (mandatory)
+
+### Minimum count
 
 ```
-inventory.json 最低件数 = max(50, files_scanned // 20)
+inventory.json minimum count = max(50, files_scanned // 20)
 ```
 
-- 例: 1,000 ファイルの Rails プロジェクト → 最低 50 件
-- 例: 5,000 ファイルの大規模 JS プロジェクト → 最低 250 件
+- Example: 1,000-file Rails project → at least 50 entries
+- Example: 5,000-file large JS project → at least 250 entries
 
-`scripts/coverage-check.py` がこの基準で fail を返す。**`source-map.json` の `stats.files_scanned` から自動算出**される。
+`scripts/coverage-check.py` fails on this rule. The value is **derived automatically from `source-map.json`'s `stats.files_scanned`**.
 
-### macro 単位の禁止
+### Macro-unit prohibition
 
-❌ **以下のようなグルーピング型 INV は禁止**:
-- `controller_group`「Account 系コントローラ群」 ← Account, Sessions, Twofa など複数を1つにまとめる
-- `model_group`「ユーザー系モデル群」 ← User, Group, Member などをまとめる
-- `module_group`「Wiki/Document 系」 ← 複数の独立した責務をまとめる
+❌ **Grouping-style INVs like the following are forbidden**:
+- `controller_group` "Account-family controllers" ← bundling Account, Sessions, Twofa together
+- `model_group` "User-family models" ← bundling User, Group, Member together
+- `module_group` "Wiki/Document family" ← bundling multiple independent responsibilities
 
-これらは粒度として粗すぎ、保守担当者がどのファイルに修正を入れればよいか判別不能になる。
+These are too coarse: maintainers cannot tell which file to modify.
 
-✅ **正しい粒度**:
+✅ **Correct granularity**:
 - 1 controller class = 1 INV
 - 1 model class = 1 INV
 - 1 service class = 1 INV
 - 1 job class = 1 INV
 - 1 concern module = 1 INV
 - 1 mailer class = 1 INV
-- 大規模 controller (300行+) の場合は **action ごとの追加 INV を許可**
+- For large controllers (300+ lines), **per-action additional INVs are allowed**
 
-`scripts/coverage-check.py` は `type` フィールドに `group` / `module` / `domain` / `category` / `bundle` / `section` を含む INV を「macro 型」と見なし、**全 INV の 20% を超えると fail**。
+`scripts/coverage-check.py` treats INVs whose `type` field contains `group` / `module` / `domain` / `category` / `bundle` / `section` as "macro type" and **fails if they exceed 20% of all INVs**.
 
 ---
 
-## Ruby on Rails 用カタログ（詳細）
+## Ruby on Rails catalogue (detailed)
 
-Rails アプリケーションに対しては、以下の単位で必ず抽出する。**この一覧を満たさない inventory.json は不合格**とみなす。
+For Rails applications, always extract by the following units. **An `inventory.json` that does not satisfy this catalogue is considered non-compliant.**
 
-### 1. Controller（`app/controllers/**/*.rb`）
-- `_controller.rb` で終わる全ファイル × 1 INV
+### 1. Controllers (`app/controllers/**/*.rb`)
+- Every file ending in `_controller.rb` × 1 INV
 - type: `controller`
-- name: クラス名（例: `IssuesController`）
-- file: 該当ファイル
-- 大規模コントローラ（300行以上）は **action 単位の追加 INV も可** (type: `controller_action`)
+- name: class name (e.g. `IssuesController`)
+- file: the file
+- Large controllers (300+ lines) may also add **per-action INVs** (type: `controller_action`)
 
-### 2. Model（`app/models/**/*.rb`）
-- 全 model class × 1 INV（ApplicationRecord 直接継承 / Principal/User の様な間接継承を含む）
+### 2. Models (`app/models/**/*.rb`)
+- Every model class × 1 INV (including direct ApplicationRecord descendants and indirect descendants like Principal/User)
 - type: `model` / `model_subclass`
-- name: クラス名（例: `Issue`, `Project`）
+- name: class name (e.g. `Issue`, `Project`)
 
-### 3. Concern（`app/controllers/concerns/`, `app/models/concerns/`）
+### 3. Concerns (`app/controllers/concerns/`, `app/models/concerns/`)
 - 1 module = 1 INV
 - type: `concern`
 
-### 4. Service / Use Case（`app/services/`, `app/use_cases/`, `lib/services/`）
+### 4. Services / use cases (`app/services/`, `app/use_cases/`, `lib/services/`)
 - 1 class = 1 INV
 - type: `service`
 
-### 5. Job（`app/jobs/**/*.rb`）
+### 5. Jobs (`app/jobs/**/*.rb`)
 - 1 class = 1 INV
 - type: `job`
 
-### 6. Mailer（`app/mailers/**/*.rb`）
+### 6. Mailers (`app/mailers/**/*.rb`)
 - 1 class = 1 INV
 - type: `mailer`
 
-### 7. Helper（`app/helpers/**/*.rb`）
+### 7. Helpers (`app/helpers/**/*.rb`)
 - 1 module = 1 INV
 - type: `helper`
 
-### 8. Lib（`lib/**/*.rb`）
-- 1 class または 1 module = 1 INV
+### 8. Lib (`lib/**/*.rb`)
+- 1 class or 1 module = 1 INV
 - type: `lib_class` / `lib_module`
 
-### 9. Migration（`db/migrate/**/*.rb`）
-- 1 migration file = 1 INV（テーブル単位として扱う）
+### 9. Migrations (`db/migrate/**/*.rb`)
+- 1 migration file = 1 INV (treated per table)
 - type: `migration`
-- name: マイグレーションクラス名（例: `CreateIssues`）
+- name: migration class name (e.g. `CreateIssues`)
 
-### 10. Route group（`config/routes.rb`）
-- `resources :foo do … end` ブロック単位 × 1 INV
-- `namespace :api do … end` ブロック単位 × 1 INV
+### 10. Route groups (`config/routes.rb`)
+- One `resources :foo do … end` block × 1 INV
+- One `namespace :api do … end` block × 1 INV
 - type: `rails_route`
-- name: `resources:issues` / `namespace:api/v1` のような prefix 付き名前
+- name: prefixed name like `resources:issues` / `namespace:api/v1`
 
-### 11. View group（`app/views/**`）
-- リソース単位（例: `app/views/issues/`）でグループ化 × 1 INV
+### 11. View groups (`app/views/**`)
+- Group per resource (e.g. `app/views/issues/`) × 1 INV
 - type: `view_group`
-- name: ディレクトリ名
+- name: directory name
 
-### 12. JavaScript module（`app/javascript/**`）
-- 1 export = 1 INV（ファイル数が少なければファイル単位）
+### 12. JavaScript modules (`app/javascript/**`)
+- 1 export = 1 INV (per file if file count is small)
 - type: `js_export`
 
-### 13. 設定ファイル（`config/*.yml`, `config/initializers/**/*.rb`）
-- 重要な initializer は 1 file = 1 INV
+### 13. Configuration files (`config/*.yml`, `config/initializers/**/*.rb`)
+- Key initializers: 1 file = 1 INV
 - type: `config`
 
-### 14. Mailer template（`app/views/mailer/**/*.erb`）
+### 14. Mailer templates (`app/views/mailer/**/*.erb`)
 - 1 file = 1 INV
 - type: `mailer_view`
 
-### Rails 粒度の参考目安
+### Rails granularity guideline
 
-| Rails アプリ規模 | 最低 INV | 内訳目安 |
+| Rails app size | Minimum INV | Approximate breakdown |
 |----------------|---------|---------|
-| 小（100 .rb） | 50 件 | controllers 10, models 15, jobs 3, lib 5, migration 10, route 5, view 2 |
-| 中（500 .rb） | 50 件 | controllers 30, models 50, services 20, jobs 10, migration 30, route 15, helpers 10 |
-| 大（1,000+ .rb） | 90 件以上 | controllers 80, models 80, concerns 20, services 30, jobs 20, migration 100+, route 30 |
+| Small (100 .rb) | 50 | controllers 10, models 15, jobs 3, lib 5, migrations 10, routes 5, views 2 |
+| Medium (500 .rb) | 50 | controllers 30, models 50, services 20, jobs 10, migrations 30, routes 15, helpers 10 |
+| Large (1,000+ .rb) | 90+ | controllers 80, models 80, concerns 20, services 30, jobs 20, migrations 100+, routes 30 |
 
-例: Redmine は 1,095 .rb → 最低 **93 件** の INV が必要（agent が `30 件` で終わらせるのは粒度不足）。
+Example: Redmine is 1,095 .rb files → at least **93 INVs** are required (an agent that stops at 30 is under-granular).

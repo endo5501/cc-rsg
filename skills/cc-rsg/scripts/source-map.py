@@ -2,25 +2,27 @@
 """
 cc-rsg source-map.py
 
-ターゲット・コードベースを走査し、「ソースユニット」を抽出して
-`.cc-rsg/source-map.json` を生成する。
+Scans the target codebase, extracts "source units", and produces
+`.cc-rsg/source-map.json`.
 
-ソースユニットの定義は言語ごとに正規表現で実装する。Tree-sitter は依存を
-増やすため v1 では使わず、保守可能な正規表現ベースで実装する。
+Source-unit definitions are implemented as language-specific regexes.
+Tree-sitter adds dependencies and is not used in v1; we stay with
+maintainable regex-based extraction.
 
-ソースユニット = 仕様書でトレーサビリティを担保したい最小単位。
-- Ruby/Rails:  class / module 単位、controller の action 単位、route group、migration、view
-- Python:      class / def 単位
-- JavaScript:  export 単位、関数定義
-- 他言語:      ファイル単位（粗いがゼロより遥かに良い）
+A source unit is the smallest item for which the spec wants
+traceability:
+- Ruby/Rails:  class / module level, controller action level, route group, migration, view
+- Python:      class / def level
+- JavaScript:  export level, function definitions
+- Other:       file level (coarse, but far better than nothing)
 
-使い方:
+Usage:
     python source-map.py \\
         --target ./src \\
         --output .cc-rsg/source-map.json \\
         --exclude-globs '**/test/**,**/vendor/**,**/node_modules/**'
 
-出力 (source-map.json) スキーマ:
+Output schema (source-map.json):
     {
       "schema_version": "0.1.0",
       "target_root": "<input target>",
@@ -61,7 +63,7 @@ from typing import Iterable
 
 
 # ----------------------------------------------------------------------------
-# ソースユニット定義
+# Source-unit definition
 # ----------------------------------------------------------------------------
 
 @dataclass
@@ -76,7 +78,7 @@ class SourceUnit:
 
 
 # ----------------------------------------------------------------------------
-# 言語別抽出ルール
+# Per-language extraction rules
 # ----------------------------------------------------------------------------
 
 RUBY_CLASS_RE = re.compile(r"^(\s*)(class|module)\s+([A-Za-z0-9_:]+)([^\n]*)")
@@ -100,8 +102,9 @@ def fingerprint(text: str) -> str:
 
 def extract_ruby_block(lines: list[str], start_idx: int, indent: str) -> int:
     """
-    Ruby の `class`/`module`/`def` ブロックの end までの行番号 (1-indexed) を返す。
-    対応する `end` の indent が start と一致する行を見つける。
+    Return the line number (1-indexed) of the `end` that closes a Ruby
+    `class` / `module` / `def` block. Found by matching the `end` whose
+    indent equals the starting indent.
     """
     end_pattern = re.compile(rf"^{re.escape(indent)}end\b")
     for j in range(start_idx + 1, len(lines)):
@@ -112,8 +115,9 @@ def extract_ruby_block(lines: list[str], start_idx: int, indent: str) -> int:
 
 def extract_py_block(lines: list[str], start_idx: int, indent: str) -> int:
     """
-    Python ブロック: インデント が start と同じか深い行が続く間、ブロックに含む。
-    最初の「インデントが start より浅い行」の手前で打ち切り。
+    Python block: while the indent stays equal or deeper than the start,
+    the block continues. Stop just before the first line whose indent is
+    shallower than the start.
     """
     base = len(indent)
     for j in range(start_idx + 1, len(lines)):
@@ -122,7 +126,7 @@ def extract_py_block(lines: list[str], start_idx: int, indent: str) -> int:
             continue
         cur_indent = len(ln) - len(ln.lstrip(" "))
         if cur_indent <= base:
-            return j  # j-1 が最後の行 (1-indexed なら j)
+            return j  # last line is j-1 (1-indexed: j)
     return len(lines)
 
 
@@ -153,7 +157,7 @@ def extract_ruby_units(
             m_route = RAILS_ROUTE_BLOCK_RE.match(line)
             if m_route:
                 indent, kw, name = m_route.groups()
-                # do…end ブロック対応 / 単行 resources :foo 対応
+                # Supports both `do…end` block form and single-line `resources :foo`.
                 if "do" in line and " end" not in line:
                     end_line = extract_ruby_block(lines, i, indent)
                 else:
@@ -191,7 +195,7 @@ def extract_py_units(rel_path: str, source: str, id_factory) -> Iterable[SourceU
         m_def = PY_DEF_RE.match(line)
         if m_def:
             indent, name, rest = m_def.groups()
-            # トップレベル def のみユニットとして登録（メソッドは class ブロックに含まれる）
+            # Register only top-level `def`s as units (methods are inside the class block).
             if indent == "":
                 end_line = extract_py_block(lines, i, indent)
                 block_text = "\n".join(lines[i:end_line])
@@ -224,7 +228,7 @@ def extract_js_units(rel_path: str, source: str, id_factory) -> Iterable[SourceU
 
 
 def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> SourceUnit:
-    """ファイル単位の粗いユニット（migration / view / config 等で使用）。"""
+    """File-granularity coarse unit (used for migrations / views / configs, etc.)."""
     lines = source.splitlines()
     name = Path(rel_path).name
     return SourceUnit(
@@ -239,14 +243,15 @@ def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> Sour
 
 
 # ----------------------------------------------------------------------------
-# ファイル分類とディスパッチ
+# File classification and dispatch
 # ----------------------------------------------------------------------------
 
 def classify_file(rel_path: str) -> list[str]:
     """
-    ファイルが該当する 1 つ以上の抽出戦略のリストを返す。
-    Returns list of strategies like ["ruby_class_def", "rails_view"].
-    Empty list = この file はユニット抽出対象外（しかし source map には記録される ── kind="file"）。
+    Return the list of one or more extraction strategies that apply to the file.
+    Strategies look like ["ruby_class_def", "rails_view"].
+    Empty list = this file is not a unit-extraction target (but the source map
+    still records it as kind="file").
     """
     p = rel_path.lower()
     strategies: list[str] = []
@@ -266,10 +271,10 @@ def classify_file(rel_path: str) -> list[str]:
     elif p.endswith((".yml", ".yaml", ".toml", ".ini", ".conf", ".cfg")):
         strategies.append("config_file")
     elif p.endswith((".css", ".scss", ".sass", ".less")):
-        # スタイル系は粗くファイル単位
+        # Stylesheets: coarse, file level.
         strategies.append("style_file")
     elif p.endswith((".md", ".rst", ".txt", ".rdoc")) and not "readme" in p:
-        # 一般 md はスキップ
+        # Skip generic Markdown.
         return []
     elif p.endswith(".sql"):
         strategies.append("sql_file")
@@ -293,7 +298,7 @@ def iter_target_files(target: Path, exclude_globs: list[str]) -> Iterable[Path]:
 
 
 # ----------------------------------------------------------------------------
-# メイン
+# Main
 # ----------------------------------------------------------------------------
 
 DEFAULT_EXCLUDES = [
@@ -344,7 +349,7 @@ def build_source_map(
             if strat == "ruby_class_def":
                 units.extend(extract_ruby_units(rel_path, source, id_factory))
             elif strat == "rails_routes":
-                # rails_routes は extract_ruby_units 内でも処理されるので重複避け
+                # rails_routes is also handled inside extract_ruby_units; skip duplicate.
                 pass
             elif strat == "rails_migration":
                 units.append(
@@ -363,7 +368,7 @@ def build_source_map(
             elif strat == "sql_file":
                 units.append(extract_file_unit(rel_path, source, "sql_file", id_factory))
 
-    # 統計集計
+    # Statistics
     by_kind: dict[str, int] = {}
     for u in units:
         by_kind[u.kind] = by_kind.get(u.kind, 0) + 1
@@ -385,7 +390,7 @@ def build_source_map(
                 "line_range": list(u.line_range),
                 "kind": u.kind,
                 "name": u.name,
-                "signature": u.signature[:240],  # 長すぎる行は切る
+                "signature": u.signature[:240],  # truncate overly long lines
                 "fingerprint": u.fingerprint,
             }
             for u in units

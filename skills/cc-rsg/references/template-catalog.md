@@ -1,214 +1,212 @@
 # Template Catalog Reference
 
-Phase 1で利用者にテンプレート候補を提示する際の選定ガイド。各テンプレートの想定対象、章立て概要、選定基準、判断ロジック(ディシジョンツリー)を定義する。
+Selection guide used in Phase 1 when presenting template candidates to the user. For each template, this document defines the intended target, chapter-outline summary, selection criteria, and the decision-tree logic.
 
 ---
 
-## 初期セット4種類
+## Initial set of 4
 
-このスキルは初期セットとして以下4種類のテンプレートを同梱する。利用者は自前のテンプレートを持参することもできる(その場合はパスを指定)。
+The skill ships with the following 4 templates by default. The user may also bring their own template (by specifying a path).
 
-1. **Webアプリケーション仕様書** (`templates/web-app.md`)
-2. **バッチ処理システム仕様書** (`templates/batch-system.md`)
-3. **APIサービス仕様書** (`templates/api-service.md`)
-4. **ライブラリ/SDK仕様書** (`templates/library-sdk.md`)
-
----
-
-## 1. Webアプリケーション仕様書
-
-### 想定対象
-- ユーザーが画面を介して操作するシステム
-- PHP(Laravel/Symfony/CakePHP)、Python(Django/Flask)、Ruby(Rails)、Node.js(Next.js/Nuxt/Express)、Java(Spring MVC)など
-- 認証・セッション管理・画面遷移を伴う
-
-### 章立て概要
-- 概要 / システム目的
-- アーキテクチャ概要
-- 画面一覧と遷移
-- ルート / エンドポイント一覧
-- データモデル(ER図、エンティティ定義)
-- 認証認可
-- 外部システム連携
-- 運用設定 / デプロイ
-- 既知の制約と未確定事項
-
-### 選定基準
-- HTMLレンダリング、テンプレートエンジン使用の証跡
-- セッション管理(`session`, `cookie`)コードの存在
-- ルーティング定義の存在(`routes/`, `urls.py`, etc.)
-- `views/`, `templates/`, `pages/`ディレクトリ
+1. **Web application spec** (`templates/web-app.md`)
+2. **Batch-system spec** (`templates/batch-system.md`)
+3. **API service spec** (`templates/api-service.md`)
+4. **Library / SDK spec** (`templates/library-sdk.md`)
 
 ---
 
-## 2. バッチ処理システム仕様書
+## 1. Web application spec
 
-### 想定対象
-- 定期実行 or イベント駆動のバックグラウンド処理
-- COBOL + JCL、cron / systemd timer、Spring Batch、Apache Airflow、Celery、Sidekiq、AWS Batch / Lambda定時実行
-- データパイプライン(ETL)も含む
+### Target
+- Systems the user operates through screens.
+- PHP (Laravel/Symfony/CakePHP), Python (Django/Flask), Ruby (Rails), Node.js (Next.js/Nuxt/Express), Java (Spring MVC), etc.
+- Authentication, session management, and screen transitions are present.
 
-### 章立て概要
-- 概要 / 業務目的
-- ジョブ一覧
-- 起動条件 / スケジュール
-- データフロー(入力 → 加工 → 出力)
-- エラー処理 / リトライ方針
-- リカバリ手順 / 障害時対応
-- 運用カレンダー / 依存関係グラフ
-- 監視 / アラート
-- 既知の制約と未確定事項
+### Chapter outline
+- Overview / system purpose
+- Architecture overview
+- Screen list and transitions
+- Routes / endpoint list
+- Data model (ER diagram, entity definitions)
+- Authentication and authorisation
+- External-system integration
+- Operations settings / deployment
+- Known constraints and unresolved items
 
-### 選定基準
-- スケジューラ設定の存在(crontab、Quartz、Airflow DAG、JCL)
-- ジョブ実行スクリプトの存在
-- 永続的なUI / API がない、もしくは管理用のみ
-- 大量データ処理の証跡(チャンク処理、バルク操作)
-
----
-
-## 3. APIサービス仕様書
-
-### 想定対象
-- 他システムから呼び出されるAPIエンドポイント群
-- REST、GraphQL、gRPC、WebSocket
-- マイクロサービス、公開API、社内API
-
-### 章立て概要
-- 概要 / API目的
-- エンドポイント一覧
-- リクエスト / レスポンス仕様(各エンドポイント)
-- エラーコード / エラーレスポンス
-- 認証(APIキー、OAuth、JWT)
-- レート制限 / クォータ
-- バージョニング
-- SLA / 性能要件
-- 既知の制約と未確定事項
-
-### 選定基準
-- OpenAPI / Swagger / GraphQLスキーマの存在
-- ルーティング定義がエンドポイント中心(`/api/...`)
-- Web UI(HTMLレンダリング)が存在しない or 副次的
-- API Gateway設定の存在(Kong, AWS API Gateway, etc.)
+### Selection criteria
+- Evidence of HTML rendering and a templating engine.
+- Session-management code (`session`, `cookie`).
+- Routing definitions present (`routes/`, `urls.py`, etc.).
+- Existence of `views/`, `templates/`, `pages/` directories.
 
 ---
 
-## 4. ライブラリ / SDK仕様書
+## 2. Batch-system spec
 
-### 想定対象
-- 他のアプリから利用される再利用可能なコード資産
-- npm / pip / composer / gem / NuGetパッケージ
-- 内製の共通ライブラリ
+### Target
+- Scheduled or event-driven background processing.
+- COBOL + JCL, cron / systemd timers, Spring Batch, Apache Airflow, Celery, Sidekiq, AWS Batch / Lambda scheduled runs.
+- Includes data pipelines (ETL).
 
-### 章立て概要
-- 概要 / ライブラリ目的
-- インストール方法
-- 公開API一覧
-- 利用例(クイックスタート)
-- 設定オプション
-- 互換性(対応言語バージョン、依存関係)
-- 拡張ポイント / プラグイン機構
-- マイグレーションガイド(過去バージョンから)
-- 既知の制約と未確定事項
+### Chapter outline
+- Overview / business purpose
+- Job catalogue
+- Triggers and schedule
+- Data flow (input → processing → output)
+- Error handling and retry policy
+- Recovery procedures
+- Operations calendar / dependency graph
+- Monitoring / alerts
+- Known constraints and unresolved items
 
-### 選定基準
-- パッケージマニフェスト(`package.json` / `setup.py` / `composer.json`等)に`name`, `version`, `main`/`module`が定義されている
-- 配布前提のディレクトリ構造(`dist/`, `lib/`, `src/`)
-- アプリケーション起動コード(main関数、エントリポイントスクリプト)が存在しない or サンプルのみ
+### Selection criteria
+- Presence of scheduler configuration (crontab, Quartz, Airflow DAG, JCL).
+- Presence of job-execution scripts.
+- No persistent UI or API, or only an admin one.
+- Evidence of large-data processing (chunked processing, bulk operations).
 
 ---
 
-## ディシジョンツリー(Claude推奨ロジック)
+## 3. API service spec
 
-Phase 1の偵察結果から、Claudeは以下の手順でテンプレートを推奨する。
+### Target
+- Endpoints called by other systems.
+- REST, GraphQL, gRPC, WebSocket.
+- Microservices, public APIs, internal APIs.
+
+### Chapter outline
+- Overview / API purpose
+- Endpoint catalogue
+- Request / response specs (per endpoint)
+- Error codes / error responses
+- Authentication (API key, OAuth, JWT)
+- Rate limiting / quotas
+- Versioning
+- SLA / performance requirements
+- Known constraints and unresolved items
+
+### Selection criteria
+- Presence of OpenAPI / Swagger / GraphQL schema.
+- Routing definitions centred on endpoints (`/api/...`).
+- No web UI (HTML rendering), or only as a secondary feature.
+- Presence of API-Gateway configuration (Kong, AWS API Gateway, etc.).
+
+---
+
+## 4. Library / SDK spec
+
+### Target
+- Reusable code consumed by other applications.
+- npm / pip / composer / gem / NuGet packages.
+- Internal common libraries.
+
+### Chapter outline
+- Overview / library purpose
+- Installation
+- Public API catalogue
+- Usage examples (quick start)
+- Configuration options
+- Compatibility (supported language versions, dependencies)
+- Extension points / plugin system
+- Migration guide (from older versions)
+- Known constraints and unresolved items
+
+### Selection criteria
+- Package manifest (`package.json` / `setup.py` / `composer.json`, etc.) defines `name`, `version`, `main` / `module`.
+- Directory structure consistent with distribution (`dist/`, `lib/`, `src/`).
+- No application-entry code (a main function, entry-point script), or only samples.
+
+---
+
+## Decision tree (Claude's recommendation logic)
+
+Based on the Phase 1 reconnaissance, Claude follows this procedure to recommend a template:
 
 ```
-1. パッケージマニフェストに main/module/bin が定義されているか?
-   YES → ライブラリ起動コードがあるか?
-            NO → ライブラリ/SDK仕様書を推奨
-            YES → 次へ進む
+1. Does the package manifest define main/module/bin?
+   YES → Is there application-startup code?
+            NO  → Recommend Library / SDK spec
+            YES → Continue
 
-2. ルーティング定義は存在するか?
-   YES → HTMLレンダリング(views/templates)があるか?
-            YES → Webアプリケーション仕様書を推奨
-            NO  → APIサービス仕様書を推奨
+2. Do routing definitions exist?
+   YES → Is there HTML rendering (views/templates)?
+            YES → Recommend Web application spec
+            NO  → Recommend API service spec
 
-3. スケジューラ設定 / バッチ実行スクリプトが主体か?
-   YES → バッチ処理システム仕様書を推奨
+3. Are scheduler configuration / batch scripts the main subject?
+   YES → Recommend Batch-system spec
 
-4. いずれにも当てはまらない / 複合型
-   → 利用者に複数候補を提示し選択を仰ぐ
-   → 例: 「WebアプリとAPIの両方を含むため、章立てをマージしたカスタム版を推奨」
-```
-
----
-
-## 複合型プロジェクトの扱い
-
-実際のプロジェクトは1テンプレートで収まらないことが多い。以下の方針で対応する。
-
-### 主従関係がある場合
-- 主たるテンプレートを選定し、従の章を追加する。
-- 例: Webアプリが主、バッチが従 → Webアプリ仕様書に「バックグラウンドジョブ」章を追加。
-
-### 同等規模の複合
-- 章立てをマージしたカスタムテンプレートを生成する。
-- 利用者に章順序の希望を確認する。
-
-### モノリポで複数サービス
-- サービス単位で別仕様書として生成することを推奨する。
-- 利用者がモノリポ全体で1仕様書を希望する場合のみマージ。
-
----
-
-## 利用者持参テンプレートの扱い
-
-利用者が自前のテンプレートを持参する場合の手順。
-
-1. テンプレートファイルのパスを取得する。
-2. テンプレートをパースして章立てを抽出する。
-3. 各章で「何を扱うか」のメタコメントの有無を確認する。
-   - メタコメントがない場合、Claudeが章タイトルから推測し、利用者に確認する。
-4. 抽出した章立てを Phase 2 のスケルトン生成に使用する。
-
----
-
-## Claude推奨を利用者が手直しするケース
-
-Claude推奨を利用者が承認した後、章の追加・削除・修正を受け付ける。
-
-```
-Claude: 「Webアプリケーション仕様書を推奨します。章立ては以下です。
-- 概要
-- アーキテクチャ
-- 画面一覧
-- ルート
-- データモデル
-- 認証認可
-- 外部連携
-- 運用設定
-
-追加・削除・修正したい章はありますか?」
-
-利用者: 「『非機能要件』章を追加してほしい。『運用設定』の前に置いて。」
-
-Claude: 「承知しました。以下の構成で確定します。
-- 概要
-- アーキテクチャ
-- 画面一覧
-- ルート
-- データモデル
-- 認証認可
-- 外部連携
-- 非機能要件   ← 追加
-- 運用設定」
+4. None of the above / composite type
+   → Present multiple candidates and ask the user.
+   → Example: "Includes both web app and API; recommend a merged custom outline."
 ```
 
 ---
 
-## テンプレートのバージョン管理
+## Handling composite projects
 
-各テンプレートファイル冒頭にバージョン情報を記載する。
+Real projects often do not fit into a single template. Handle them as follows.
+
+### When there is a primary / secondary relationship
+- Pick the primary template and add a chapter from the secondary one.
+- Example: web app primary, batch secondary → add a "background jobs" chapter to the web-app spec.
+
+### Composite at equal scale
+- Generate a custom template by merging the chapter outlines.
+- Ask the user for the chapter-ordering preference.
+
+### Monorepo with multiple services
+- Recommend generating separate specs per service.
+- Merge into a single spec only if the user explicitly wants one spec for the whole monorepo.
+
+---
+
+## When the user brings their own template
+
+1. Get the path to the template file.
+2. Parse the template and extract the chapter outline.
+3. Check whether each chapter has a meta-comment describing what it covers.
+   - When missing, Claude infers it from the chapter title and confirms with the user.
+4. Use the extracted outline for Phase 2 skeleton generation.
+
+---
+
+## When the user adjusts Claude's recommendation
+
+After the user accepts the recommendation, accept chapter additions, removals, or renames.
+
+```
+Claude: "I recommend the Web application spec. The outline is:
+- Overview
+- Architecture
+- Screen list
+- Routes
+- Data model
+- Authentication and authorisation
+- External integration
+- Operations settings
+
+Any chapters to add, remove, or rename?"
+
+User: "Add a 'non-functional requirements' chapter. Place it before 'Operations settings'."
+
+Claude: "Got it. Finalising with:
+- Overview
+- Architecture
+- Screen list
+- Routes
+- Data model
+- Authentication and authorisation
+- External integration
+- Non-functional requirements   ← added
+- Operations settings"
+```
+
+---
+
+## Template version management
+
+Each template file starts with version information.
 
 ```yaml
 ---
@@ -218,19 +216,19 @@ last_updated: 2026-05-01
 ---
 ```
 
-利用プロジェクトのwbs.jsonにテンプレートバージョンを記録し、再現性を担保する。
+The consuming project's `wbs.json` records the template version, guaranteeing reproducibility.
 
 ---
 
-## 不足するテンプレートの追加方針
+## Future templates
 
-OSS公開後、利用者から以下のテンプレートが要望された場合は追加検討する。
+After OSS release, the following templates may be added in response to user requests:
 
-- データウェアハウス / DWH仕様書
-- 機械学習パイプライン仕様書
-- インフラ構成書(IaC, Terraform, Kubernetes)
-- モバイルアプリ仕様書(iOS/Android/React Native/Flutter)
-- ブロックチェーン / スマートコントラクト仕様書
-- ゲーム仕様書
+- Data warehouse / DWH spec
+- Machine-learning pipeline spec
+- Infrastructure spec (IaC, Terraform, Kubernetes)
+- Mobile app spec (iOS / Android / React Native / Flutter)
+- Blockchain / smart-contract spec
+- Game-design spec
 
-利用者要望はGitHub Issuesで受け付ける。
+Requests are received via GitHub Issues.

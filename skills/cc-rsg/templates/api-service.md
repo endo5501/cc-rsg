@@ -2,295 +2,295 @@
 template_name: api-service
 template_version: 0.1.0
 last_updated: 2026-05-01
-description: APIサービス仕様書テンプレート。REST/GraphQL/gRPC を提供するマイクロサービスや公開API向け。
+description: API service spec template. For microservices and public APIs that expose REST/GraphQL/gRPC.
 ---
 
-# APIサービス仕様書テンプレート
+# API service spec template
 
-このテンプレートは、他システムから呼び出されるAPIエンドポイント群の仕様書を生成するための章立てを定義する。
+This template defines the chapter outline for the spec of a service whose endpoints are called by other systems.
 
-REST、GraphQL、gRPC、WebSocket等のAPIサービス、マイクロサービス、公開APIを想定。
-
----
-
-## 章立て
-
-### 第1章: 概要
-
-<!-- meta: API全体の目的とスコープ。 -->
-
-#### 1.1 API目的
-- このAPIが提供する価値
-- 想定利用者(社内システム / パートナー / 一般公開)
-- ビジネス上の位置づけ
-
-#### 1.2 主要ユースケース
-- 代表的な利用シナリオ3〜5件
-
-#### 1.3 サービス構成図
-- API Gateway / Load Balancer / Backend の構成
-- 関連サービス間の依存
+Designed for API services, microservices, and public APIs over REST, GraphQL, gRPC, WebSocket, etc.
 
 ---
 
-### 第2章: アーキテクチャ概要
+## Chapter outline
 
-<!-- meta: 技術選択と全体構造。 -->
+### Chapter 1: Overview
 
-#### 2.1 採用技術スタック
-- 言語・フレームワーク(Spring Boot / Express / FastAPI / .NET等)
-- API スタイル(REST / GraphQL / gRPC / WebSocket)
-- API 仕様記述(OpenAPI / GraphQL SDL / .proto)
+<!-- meta: purpose and scope of the API as a whole. -->
 
-#### 2.2 内部アーキテクチャ
-- レイヤー構成(Controller / Service / Repository等)
-- データストア(RDB / NoSQL / Cache)
-- メッセージング基盤
+#### 1.1 API purpose
+- The value the API provides
+- Intended consumers (internal systems / partners / public)
+- Position in the business
 
-#### 2.3 デプロイ構成
-- 実行環境(Kubernetes / ECS / Lambda等)
-- スケーリング方式
+#### 1.2 Main use cases
+- 3-5 representative scenarios
+
+#### 1.3 Service composition diagram
+- API Gateway / Load Balancer / Backend structure
+- Dependencies on related services
 
 ---
 
-### 第3章: エンドポイント一覧
+### Chapter 2: Architecture overview
 
-<!-- meta: 全エンドポイントのインベントリ。検証の主軸。 -->
+<!-- meta: technology choices and overall structure. -->
 
-#### 3.1 エンドポイントカタログ
-| エンドポイントID | メソッド | パス | 概要 | 認証 | バージョン |
+#### 2.1 Technology stack
+- Language / framework (Spring Boot / Express / FastAPI / .NET, etc.)
+- API style (REST / GraphQL / gRPC / WebSocket)
+- API spec format (OpenAPI / GraphQL SDL / .proto)
+
+#### 2.2 Internal architecture
+- Layering (Controller / Service / Repository, etc.)
+- Data stores (RDB / NoSQL / Cache)
+- Messaging infrastructure
+
+#### 2.3 Deployment topology
+- Runtime (Kubernetes / ECS / Lambda, etc.)
+- Scaling strategy
+
+---
+
+### Chapter 3: Endpoint catalogue
+
+<!-- meta: inventory of all endpoints. The pillar of verification. -->
+
+#### 3.1 Endpoint catalogue
+| Endpoint ID | Method | Path | Summary | Auth | Version |
 |---------------|---------|------|------|------|----------|
-| EP-001 | GET | /v1/users/{id} | ユーザー取得 | required | v1 |
-| EP-002 | POST | /v1/users | ユーザー作成 | required | v1 |
+| EP-001 | GET | /v1/users/{id} | Get user | required | v1 |
+| EP-002 | POST | /v1/users | Create user | required | v1 |
 | ... | ... | ... | ... | ... | ... |
 
-#### 3.2 リソース別グルーピング
-- リソース別にエンドポイントを整理
-- リソース間の関係
+#### 3.2 Grouping by resource
+- Organise endpoints by resource
+- Relationships between resources
 
 ---
 
-### 第4章: リクエスト / レスポンス仕様
+### Chapter 4: Request / response specifications
 
-<!-- meta: 各エンドポイントの詳細。OpenAPIから生成可能なら参照のみでもよい。 -->
+<!-- meta: per-endpoint details. If they can be generated from OpenAPI, reference only is acceptable. -->
 
-エンドポイントごとに以下を記述:
+For each endpoint, describe:
 
-#### {エンドポイント名}
+#### {Endpoint name}
 
-##### 概要
-- 目的
-- 利用シナリオ
+##### Overview
+- Purpose
+- Use scenario
 
-##### リクエスト
-- HTTPメソッド + パス
-- パスパラメータ
-- クエリパラメータ
-- ヘッダー(必須・任意)
-- リクエストボディ(スキーマ + 例)
+##### Request
+- HTTP method + path
+- Path parameters
+- Query parameters
+- Headers (required / optional)
+- Request body (schema + example)
 
-##### レスポンス
-- 成功時(2xx)
-  - ステータスコード
-  - レスポンスボディ(スキーマ + 例)
-  - レスポンスヘッダー
-- エラー時(4xx, 5xx)
-  - 想定エラーコード一覧
-  - エラーレスポンスボディ
+##### Response
+- Success (2xx)
+  - Status code
+  - Response body (schema + example)
+  - Response headers
+- Error (4xx, 5xx)
+  - Expected error codes
+  - Error response body
 
-##### 副作用
-- データベース更新
-- 外部システム連携呼び出し
-- イベント発行
+##### Side effects
+- Database updates
+- Calls to external systems
+- Events published
 
-##### 冪等性
-- 冪等性の有無
-- 冪等キー指定方法(対応している場合)
+##### Idempotency
+- Whether the endpoint is idempotent
+- Idempotency-key mechanism (if supported)
 
 ---
 
-### 第5章: エラーコード / エラーレスポンス
+### Chapter 5: Error codes / error responses
 
-<!-- meta: 全エラーコードの一覧と意味。 -->
+<!-- meta: full error-code list and semantics. -->
 
-#### 5.1 エラーレスポンス共通フォーマット
+#### 5.1 Common error-response format
 ```json
 {
   "error": {
     "code": "USER_NOT_FOUND",
-    "message": "指定されたユーザーが見つかりません",
+    "message": "The specified user was not found",
     "details": {},
     "trace_id": "..."
   }
 }
 ```
 
-#### 5.2 エラーコード一覧
-| コード | HTTPステータス | カテゴリ | 意味 | 利用者対応 |
+#### 5.2 Error-code list
+| Code | HTTP status | Category | Meaning | Consumer action |
 |-------|--------------|---------|------|----------|
-| USER_NOT_FOUND | 404 | クライアントエラー | ユーザー不在 | IDを確認 |
-| RATE_LIMIT_EXCEEDED | 429 | クライアントエラー | レート制限 | リトライ |
-| INTERNAL_ERROR | 500 | サーバーエラー | 内部障害 | 問い合わせ |
+| USER_NOT_FOUND | 404 | client error | User does not exist | Check the ID |
+| RATE_LIMIT_EXCEEDED | 429 | client error | Rate-limited | Retry |
+| INTERNAL_ERROR | 500 | server error | Internal failure | Contact support |
 | ... | ... | ... | ... | ... |
 
-#### 5.3 HTTPステータスコード方針
-- 200, 201, 204 の使い分け
-- 400, 401, 403, 404, 409, 422 の使い分け
-- 500, 502, 503, 504 の使い分け
+#### 5.3 HTTP status-code policy
+- When to use 200 vs 201 vs 204
+- When to use 400 vs 401 vs 403 vs 404 vs 409 vs 422
+- When to use 500 vs 502 vs 503 vs 504
 
 ---
 
-### 第6章: 認証
+### Chapter 6: Authentication
 
-<!-- meta: 認証方式の詳細。 -->
+<!-- meta: authentication-method details. -->
 
-#### 6.1 認証方式
-- APIキー / OAuth 2.0 / JWT / mTLS / Basic認証
-- 採用方式の選定理由
+#### 6.1 Authentication method
+- API key / OAuth 2.0 / JWT / mTLS / Basic auth
+- Reason for the choice
 
-#### 6.2 認証フロー
-- トークン取得手順
-- トークン有効期限
-- リフレッシュ手順
+#### 6.2 Authentication flow
+- Token-acquisition steps
+- Token lifetime
+- Refresh procedure
 
-#### 6.3 認可
-- スコープ / 権限
-- ロールベースアクセス制御(RBAC)
+#### 6.3 Authorisation
+- Scopes / permissions
+- Role-based access control (RBAC)
 
-#### 6.4 認証情報の管理
-- 鍵 / シークレットの保管方法
-- ローテーション手順
+#### 6.4 Credential management
+- Where keys / secrets are stored
+- Rotation procedure
 
 ---
 
-### 第7章: レート制限 / クォータ
+### Chapter 7: Rate limiting / quotas
 
-<!-- meta: 利用上限と挙動。 -->
+<!-- meta: usage caps and behaviour. -->
 
-#### 7.1 レート制限ポリシー
-| 区分 | 制限値 | 制限単位 | 適用範囲 |
+#### 7.1 Rate-limit policy
+| Tier | Limit | Unit | Scope |
 |------|-------|---------|---------|
-| 無料プラン | 100 req/min | 分 | APIキー単位 |
-| 有料プラン | 10000 req/min | 分 | APIキー単位 |
+| Free plan | 100 req/min | per minute | per API key |
+| Paid plan | 10000 req/min | per minute | per API key |
 | ... | ... | ... | ... |
 
-#### 7.2 制限超過時の挙動
-- HTTPステータス(429 Too Many Requests)
-- Retry-After ヘッダー
-- 制限解除タイミング
+#### 7.2 Behaviour on exceeding the limit
+- HTTP status (429 Too Many Requests)
+- Retry-After header
+- When the limit resets
 
-#### 7.3 クォータ
-- 月次・日次の合計呼び出し上限
-- 超過時の扱い
+#### 7.3 Quotas
+- Monthly / daily total-call ceilings
+- Behaviour when exceeded
 
 ---
 
-### 第8章: バージョニング
+### Chapter 8: Versioning
 
-<!-- meta: API進化と互換性。 -->
+<!-- meta: API evolution and compatibility. -->
 
-#### 8.1 バージョニング戦略
-- URLパス方式(/v1/, /v2/)
-- ヘッダー方式
-- メディアタイプ方式
+#### 8.1 Versioning strategy
+- URL-path style (/v1/, /v2/)
+- Header style
+- Media-type style
 
-#### 8.2 サポートバージョン一覧
-| バージョン | リリース日 | サポート終了予定 | 状態 |
+#### 8.2 Supported versions
+| Version | Released | Sunset planned | Status |
 |----------|----------|---------------|------|
-| v1 | 2024-01 | 2026-12 | アクティブ |
-| v2 | 2026-03 | - | アクティブ(推奨) |
+| v1 | 2024-01 | 2026-12 | active |
+| v2 | 2026-03 | - | active (recommended) |
 
-#### 8.3 破壊的変更ポリシー
-- 破壊的変更の定義
-- 事前通知期間
-- マイグレーションガイド提供
+#### 8.3 Breaking-change policy
+- What counts as a breaking change
+- Advance-notice period
+- Migration-guide commitment
 
-#### 8.4 後方互換性
-- 後方互換性を保つ変更パターン
-- 非推奨化(Deprecation)プロセス
+#### 8.4 Backward compatibility
+- Change patterns that preserve compatibility
+- Deprecation process
 
 ---
 
-### 第9章: SLA / 性能要件
+### Chapter 9: SLA / performance requirements
 
-<!-- meta: 提供する品質。 -->
+<!-- meta: the quality the service provides. -->
 
-#### 9.1 可用性目標
-- 可用性 SLA(例: 99.9%)
-- 計測方式
-- 計画停止の通知方法
+#### 9.1 Availability targets
+- Availability SLA (e.g. 99.9%)
+- Measurement method
+- How planned downtime is announced
 
-#### 9.2 性能目標
-| 指標 | 目標値 | 計測方式 |
+#### 9.2 Performance targets
+| Metric | Target | Measurement |
 |------|-------|---------|
-| 平均応答時間 | < 200ms | p50 |
-| 95パーセンタイル応答時間 | < 500ms | p95 |
-| ピークスループット | 10000 RPS | 1分間隔 |
+| Mean response time | < 200ms | p50 |
+| 95th percentile response time | < 500ms | p95 |
+| Peak throughput | 10000 RPS | over 1-minute windows |
 
-#### 9.3 障害対応
-- インシデント分類
-- 連絡フロー
-- ステータスページ
+#### 9.3 Incident response
+- Incident classification
+- Communication flow
+- Status page
 
 ---
 
-### 第10章: 運用設定
+### Chapter 10: Operations settings
 
-<!-- meta: デプロイ・監視・ログ。 -->
+<!-- meta: deployment / monitoring / logging. -->
 
-#### 10.1 環境変数 / 設定値
-| 変数名 | 必須 | デフォルト | 用途 |
+#### 10.1 Environment variables / configuration values
+| Variable | Required | Default | Purpose |
 |-------|------|----------|------|
-| DB_HOST | 必須 | - | データベース接続先 |
+| DB_HOST | required | - | Database connection target |
 | ... | ... | ... | ... |
 
-#### 10.2 デプロイ手順
-- ビルド・デプロイパイプライン
-- カナリアリリース有無
-- ロールバック手順
+#### 10.2 Deployment procedure
+- Build / deploy pipeline
+- Canary releases (if used)
+- Rollback procedure
 
-#### 10.3 監視
-- 監視対象メトリクス
-- アラート条件
-- ダッシュボード
+#### 10.3 Monitoring
+- Monitored metrics
+- Alert conditions
+- Dashboards
 
-#### 10.4 ログ
-- アクセスログ仕様
-- アプリケーションログ仕様
-- ログ保管期間
-
----
-
-### 第11章: 既知の制約と未確定事項
-
-<!-- meta: 仕様書の信頼性担保。 -->
-
-#### 11.1 既知の技術的制約
-- リクエストボディサイズ上限
-- 同時接続数上限
-- 既知のバグ / 回避策
-
-#### 11.2 未確定事項
-- Question Bank の `abandoned` エントリをここに記載
+#### 10.4 Logging
+- Access-log spec
+- Application-log spec
+- Log retention period
 
 ---
 
-## 章立てのカスタマイズ指針
+### Chapter 11: Known constraints and unresolved items
 
-### GraphQL の場合
-- 第3章を「Schema」「Query」「Mutation」「Subscription」に再構成
-- 第4章をリゾルバー単位の記述に変更
+<!-- meta: spec credibility safeguard. -->
 
-### gRPC の場合
-- 第3章を「Service」「RPC Method」に再構成
-- 第4章を `.proto` メッセージ定義中心に変更
+#### 11.1 Known technical constraints
+- Request-body size cap
+- Concurrent-connection cap
+- Known bugs / workarounds
 
-### WebSocket の場合
-- 第3章を「メッセージタイプ」中心に変更
-- 第4章をクライアント / サーバ間メッセージフロー中心に変更
+#### 11.2 Unresolved items
+- Place the `abandoned` entries from the Question Bank here
 
-### 公開API(外部開発者向け)の場合
-- 「クイックスタート」「SDKサポート」章を追加
-- 「ChangeLog」章を追加
+---
 
-カスタマイズはPhase 1のテンプレート選定後、利用者との対話で確定する。
+## Customisation guidance
+
+### GraphQL
+- Restructure Chapter 3 into "Schema", "Query", "Mutation", "Subscription".
+- Change Chapter 4 to per-resolver descriptions.
+
+### gRPC
+- Restructure Chapter 3 into "Service" and "RPC Method".
+- Change Chapter 4 to centre on `.proto` message definitions.
+
+### WebSocket
+- Restructure Chapter 3 around "message types".
+- Change Chapter 4 to centre on client / server message flow.
+
+### Public API (for external developers)
+- Add "Quick start" and "SDK support" chapters.
+- Add a "Changelog" chapter.
+
+Customisation is finalised in dialogue with the user after Phase 1 template selection.

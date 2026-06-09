@@ -1,246 +1,246 @@
 # Question Categories Reference
 
-Question Bankの7標準カテゴリの詳細定義と、カスタムカテゴリ追加方法。
+Detailed definitions of the Question Bank's 7 standard categories, plus how to add custom categories.
 
 ---
 
-## 7標準カテゴリ
+## 7 standard categories
 
-### 1. business_rule(業務ルール)
+### 1. business_rule
 
-#### 定義
-業務上の判断基準・ルールに関する疑問。「なぜこの条件分岐が存在するのか」「このしきい値の業務的根拠は何か」などコードを読むだけでは答えが出ない疑問。
+#### Definition
+Questions about business judgement criteria and rules. "Why does this branch exist?", "What business justification supports this threshold?" — questions whose answers cannot be derived from reading the code alone.
 
-#### 典型例
-- このリトライ回数は技術的制約か業務要件か
-- なぜ売上集計から特定のステータスを除外しているのか
-- このしきい値(50,000円)の業務的根拠は何か
-- このバッチが月末に走る理由は何か(月締め業務か、システム都合か)
+#### Typical examples
+- Is this retry count driven by a technical constraint or by a business requirement?
+- Why does sales aggregation exclude a particular status?
+- What is the business basis of this 50,000-yen threshold?
+- Why does this batch run on the last day of the month — is it a month-end accounting requirement or a system convenience?
 
-#### 解決方法
-- SME(業務有識者)への確認が最有力
-- 業務マニュアル・規程の参照
-- 過去の議事録・チケット履歴
+#### How to resolve
+- Direct interview with SME (subject-matter experts) is most effective.
+- Consult business manuals and policy documents.
+- Check past meeting minutes and ticket history.
 
-#### 解決できない場合の影響
-- 「業務ルールの正確性」が損なわれる。仕様書を読んだ開発者が誤った前提でコード変更を行うリスク。
-
----
-
-### 2. architecture_decision(アーキテクチャ判断)
-
-#### 定義
-設計上の選択がなぜなされたかに関する疑問。「なぜこのパターンを採用したか」「なぜこの分割なのか」など、設計者の意図に関わる疑問。
-
-#### 典型例
-- なぜリポジトリパターンを使用しているのか(DI? テスタビリティ? 過去の規約?)
-- なぜマイクロサービスに分割したのか
-- なぜCQRSパターンを採用したのか
-- このイベント駆動構成の意図は何か(疎結合のため? スケール対応?)
-
-#### 解決方法
-- アーキテクチャ決定記録(ADR)の参照
-- 元設計者へのインタビュー
-- 過去のスプリントレビュー資料
-
-#### 解決できない場合の影響
-- リファクタリング時に「変えていい設計」と「変えてはいけない設計」の区別がつかない。
+#### Impact when unresolved
+- "Business-rule correctness" is undermined. Developers who later read the spec may modify the code under wrong premises.
 
 ---
 
-### 3. data_model_intent(データモデル意図)
+### 2. architecture_decision
 
-#### 定義
-データベーススキーマやドメインモデルの設計意図に関する疑問。「このフィールドの本当の用途は何か」「なぜこの正規化を選択したか」など。
+#### Definition
+Questions about why a particular design choice was made. "Why was this pattern adopted?", "Why was the boundary placed here?" — questions tied to the designer's intent.
 
-#### 典型例
-- `user.flag_a`, `user.flag_b` のフラグの意味は何か
-- なぜこのテーブルを非正規化しているのか(性能対策? 業務都合?)
-- このNULL許容カラムは将来拡張用か、今も使われているのか
-- このENUM値の `LEGACY_001` は何を表しているのか
+#### Typical examples
+- Why does the codebase use the repository pattern (DI? testability? legacy convention?)?
+- Why was the system split into microservices?
+- Why was CQRS adopted?
+- What is the intent of this event-driven composition (loose coupling? scaling?)?
 
-#### 解決方法
-- データベース設計書の参照
-- 実データのサンプリング(本番DBへの読み取りクエリ)
-- ER図 / DDLコメント
+#### How to resolve
+- Consult Architecture Decision Records (ADRs).
+- Interview the original designer.
+- Review past sprint-review materials.
 
-#### 解決できない場合の影響
-- データ移行・スキーマ変更時に意図しない破壊を引き起こす。
-
----
-
-### 4. external_integration(外部システム連携)
-
-#### 定義
-外部システム・APIとの連携仕様に関する疑問。
-
-#### 典型例
-- この決済ゲートウェイのバージョンは何か(API v1? v2?)
-- このWebhookのリトライ仕様は外部システム側の仕様か、当方の実装か
-- この認証トークンの取得手順は文書化されているか
-- なぜこのフィールドだけBase64エンコードしているのか(外部仕様? 内部都合?)
-
-#### 解決方法
-- 外部システムの公式ドキュメント参照(WebFetch有効活用)
-- 連携先の担当者への確認
-- 過去の連携試験ログ
-
-#### 解決できない場合の影響
-- 外部システムのバージョンアップ・廃止時に追従できない。
+#### Impact when unresolved
+- During refactoring, "designs that can change" cannot be distinguished from "designs that must not change".
 
 ---
 
-### 5. naming_history(命名・歴史的経緯)
+### 3. data_model_intent
 
-#### 定義
-コードの命名やコメントが示唆する歴史的経緯に関する疑問。「なぜこの名前なのか」「このコメントは何を意味するのか」「このコードはまだ使われているのか」など。
+#### Definition
+Questions about the design intent behind database schemas or domain models. "What is the real purpose of this field?", "Why was this denormalisation chosen?", etc.
 
-#### 典型例
-- `temp_fix_v3` という変数名の意図は
-- `// FIXME: 2018年の暫定対応` というコメントの背景は
-- `OldUserService` クラスはまだ使われているか、廃止予定か
-- `_deprecated` プレフィックスの基準は何か
+#### Typical examples
+- What do the flags `user.flag_a` and `user.flag_b` actually mean?
+- Why is this table denormalised (performance? business reason?)?
+- Is this nullable column reserved for future use, or is it actively used today?
+- What does the `LEGACY_001` enum value represent?
 
-#### 解決方法
-- Git Blame / 履歴の参照
-- 過去のIssue/PRの追跡
-- 元担当者へのインタビュー
+#### How to resolve
+- Consult the database design document.
+- Sample real data (read-only query against production DB).
+- Look at ER diagrams / DDL comments.
 
-#### 解決できない場合の影響
-- デッドコードの判断ができず、不要な保守コストが発生する。
-
----
-
-### 6. operational_requirement(運用要件)
-
-#### 定義
-運用面での要件・制約に関する疑問。SLA、バックアップ、監視、デプロイ手順などコードに直接書かれていない要件。
-
-#### 典型例
-- このバッチの想定実行時間は何時間か(SLAは存在するか)
-- バックアップ取得頻度・世代管理の方針は
-- このサービスの想定同時接続数は
-- 障害時のリカバリRTO/RPOは
-
-#### 解決方法
-- 運用設計書の参照
-- 監視ダッシュボードの確認
-- インフラ担当者へのヒアリング
-
-#### 解決できない場合の影響
-- 運用引き継ぎ時に「何を監視すべきか」「どこまで耐えればよいか」が不明。
+#### Impact when unresolved
+- Unintended destruction during data migration or schema changes.
 
 ---
 
-### 7. security_compliance(セキュリティ・コンプライアンス)
+### 4. external_integration
 
-#### 定義
-セキュリティ要件、法令遵守、業界標準への準拠に関する疑問。
+#### Definition
+Questions about the specifications of integration with external systems / APIs.
 
-#### 典型例
-- この個人情報フィールドはGDPR対応済みか
-- このログ出力にPII(個人識別情報)は含まれるか
-- このAPIキー保管方法は社内ポリシー準拠か
-- この暗号化アルゴリズム(AES-128)は現行基準で十分か
+#### Typical examples
+- Which version of the payment gateway is being used (API v1? v2?)?
+- Is this webhook's retry behaviour the external system's spec, or our implementation?
+- Is the procedure for obtaining this authentication token documented?
+- Why is only this field Base64-encoded — is that the external spec or a local choice?
 
-#### 解決方法
-- セキュリティポリシー文書の参照
-- セキュリティ担当者への確認
-- 監査記録 / 脆弱性診断結果
+#### How to resolve
+- Consult the external system's official documentation (use WebFetch).
+- Ask the integration counterpart's owner.
+- Look at past integration-test logs.
 
-#### 解決できない場合の影響
-- 法令違反 / セキュリティインシデントの引き金になる。
+#### Impact when unresolved
+- Inability to keep up when the external system bumps a version or deprecates an API.
 
 ---
 
-## カテゴリ判定ロジック(Claudeへの指示)
+### 5. naming_history
 
-サブエージェントが疑問を生成する際、以下のフローでカテゴリを決定する。
+#### Definition
+Questions about historical context implied by naming and comments. "Why is it named this?", "What does this comment mean?", "Is this code still in use?", etc.
+
+#### Typical examples
+- What does the variable name `temp_fix_v3` suggest?
+- What is the background of `// FIXME: 2018 temporary fix`?
+- Is the class `OldUserService` still used, or scheduled for removal?
+- What is the criterion for the `_deprecated` prefix?
+
+#### How to resolve
+- Use Git blame / history.
+- Trace past Issues / PRs.
+- Interview the original author.
+
+#### Impact when unresolved
+- Dead code cannot be reliably identified, generating unnecessary maintenance cost.
+
+---
+
+### 6. operational_requirement
+
+#### Definition
+Questions about operational requirements and constraints — SLAs, backups, monitoring, deployment procedures, etc., that are not written in the source.
+
+#### Typical examples
+- What is the expected runtime of this batch (does an SLA exist)?
+- What is the backup-frequency and generation-management policy?
+- What is the expected concurrent-connection load for this service?
+- What are the RTO/RPO targets for recovery?
+
+#### How to resolve
+- Consult the operations design document.
+- Check the monitoring dashboards.
+- Interview the infrastructure team.
+
+#### Impact when unresolved
+- When operations hand-off happens, "what to monitor" and "where to draw the line" become unclear.
+
+---
+
+### 7. security_compliance
+
+#### Definition
+Questions about security requirements, regulatory compliance, and conformance to industry standards.
+
+#### Typical examples
+- Is this personal-information field GDPR-compliant?
+- Does this log output contain PII (personally identifiable information)?
+- Is this API-key storage compliant with the internal security policy?
+- Is this encryption algorithm (AES-128) acceptable under current standards?
+
+#### How to resolve
+- Consult the security-policy documents.
+- Ask the security team.
+- Review audit records / vulnerability-assessment results.
+
+#### Impact when unresolved
+- Risk of regulatory violations or security incidents.
+
+---
+
+## Category-selection logic (instructions to Claude)
+
+When a sub-agent raises a question, use this flow to choose the category:
 
 ```
-1. 疑問が「業務的判断」を問うているか?
+1. Is the question about a "business decision"?
    YES → business_rule
-2. 疑問が「設計選択の意図」を問うているか?
+2. Is the question about a "design choice's intent"?
    YES → architecture_decision
-3. 疑問が「データの構造・意味」を問うているか?
+3. Is the question about "data structure / semantics"?
    YES → data_model_intent
-4. 疑問が「外部システムとの境界」を問うているか?
+4. Is the question about "the boundary with external systems"?
    YES → external_integration
-5. 疑問が「命名・コメント・歴史」を問うているか?
+5. Is the question about "naming / comments / history"?
    YES → naming_history
-6. 疑問が「運用・監視・SLA」を問うているか?
+6. Is the question about "operations / monitoring / SLA"?
    YES → operational_requirement
-7. 疑問が「セキュリティ・コンプライアンス」を問うているか?
+7. Is the question about "security / compliance"?
    YES → security_compliance
-8. いずれにも該当しない場合
-   → カスタムカテゴリ候補として保留し、Phase 4の正規化時にユーザーに提示
+8. None of the above
+   → Hold as a custom-category candidate; surface to the user during Phase 4 deduplication.
 ```
 
-複数カテゴリにまたがる疑問は、最も主要なカテゴリを選び、`related_categories`フィールドで補助分類する。
+When a question spans multiple categories, choose the dominant one and add the others to a `related_categories` field for auxiliary classification.
 
 ---
 
-## カスタムカテゴリの追加方法
+## Adding custom categories
 
-### 初版のサポート範囲
-初版では UI 経由のカスタムカテゴリ追加は提供しない。利用者が手動で `.cc-rsg/questions.json` を編集することで追加可能。
+### v1 support range
+The initial release does not support adding custom categories through a UI. Users can add them by editing `.cc-rsg/questions.json` manually.
 
-### 手動追加の手順
+### Manual procedure
 
-1. `.cc-rsg/custom-categories.json` を新規作成する。
+1. Create `.cc-rsg/custom-categories.json`:
 
    ```json
    {
      "categories": [
        {
          "id": "performance_tuning",
-         "label_ja": "性能チューニング",
          "label_en": "Performance Tuning",
-         "description": "性能最適化の判断・しきい値に関する疑問"
+         "label_ja": "性能チューニング",
+         "description": "Questions about performance-optimisation decisions and thresholds"
        }
      ]
    }
    ```
 
-2. `questions.json` の各疑問エントリの `category` フィールドに上記 `id` を設定する。
+2. Set the `category` field of relevant entries in `questions.json` to the new `id`.
 
-3. Phase 5の対話時、Claudeはカスタムカテゴリも7標準カテゴリと同等に扱う。
+3. During Phase 5 dialogue, Claude treats custom categories on equal footing with the 7 standard categories.
 
-### 将来の拡張案
+### Future extensions
 
-- AskUserQuestionによる対話的なカスタムカテゴリ追加機構
-- カスタムカテゴリのテンプレート(よく使われるカテゴリ集)
+- Interactive custom-category addition via AskUserQuestion
+- Custom-category templates (a library of commonly used categories)
 
 ---
 
-## カテゴリ別の対話戦略
+## Per-category dialogue strategy
 
-Phase 5の対話で利用者の負担を軽減するため、カテゴリごとに対話戦略を変える。
+To reduce user burden in Phase 5, vary the dialogue strategy per category.
 
-| カテゴリ | 推奨対話戦略 |
+| Category | Recommended strategy |
 |---------|-----------|
-| business_rule | SMEに集中ヒアリング(連続質問) |
-| architecture_decision | 元設計者がいれば連続質問、いなければ推測+abandoned |
-| data_model_intent | 実データサンプリングで答えが出ることが多い |
-| external_integration | 外部ドキュメント参照を優先(WebFetch) |
-| naming_history | Git Blameで多くは答えが出る |
-| operational_requirement | インフラ/運用担当者へまとめてヒアリング |
-| security_compliance | セキュリティ担当者へ正式照会(時間がかかる) |
+| business_rule | Focused interview with SME (consecutive questions) |
+| architecture_decision | Consecutive questions if the original designer is available, otherwise inference + abandoned |
+| data_model_intent | Often answerable by sampling real data |
+| external_integration | Prefer external-doc lookup (WebFetch) |
+| naming_history | Most are answered by Git blame |
+| operational_requirement | Group questions and interview infra / ops in one pass |
+| security_compliance | Formal inquiry to security; expect a delay |
 
 ---
 
-## カテゴリと深刻度の関係性
+## Category vs severity tendencies
 
-経験則として、カテゴリと深刻度には以下の傾向がある(必ずしも当てはまるわけではない)。
+Empirically, categories and severity correlate as follows (not strict).
 
-| カテゴリ | critical頻度 | 備考 |
+| Category | critical frequency | Notes |
 |---------|------------|------|
-| business_rule | 高 | 業務正確性に直結 |
-| architecture_decision | 中 | リファクタリング判断に影響 |
-| data_model_intent | 高 | データ移行リスク |
-| external_integration | 中 | 連携不全リスク |
-| naming_history | 低 | 多くはnice-to-have |
-| operational_requirement | 中 | 運用引き継ぎに必要 |
-| security_compliance | 高 | 法令違反リスク |
+| business_rule | High | Directly affects business correctness |
+| architecture_decision | Medium | Affects refactoring decisions |
+| data_model_intent | High | Data-migration risk |
+| external_integration | Medium | Integration-failure risk |
+| naming_history | Low | Mostly nice-to-have |
+| operational_requirement | Medium | Needed for operations hand-off |
+| security_compliance | High | Regulatory-violation risk |
 
-サブエージェントが深刻度を判定する際の参考とする。
+Sub-agents may use this as a hint when deciding severity.

@@ -1,74 +1,74 @@
 # Subagent Prompt Reference
 
-Phase 3でTaskツールを介して並列起動するサブエージェントへ渡すプロンプトの完全版テンプレート。
+Full template for the prompt handed to the sub-agent launched in Phase 3 via the Task tool.
 
-サブエージェントは独立したcontextで動作するため、必要な情報をすべてプロンプトに含める必要がある。一方で、過剰な情報はcontextを圧迫し精度を下げる。本ドキュメントは「必要十分」のラインを定義する。
-
----
-
-## プロンプト構造
-
-サブエージェントへのプロンプトは以下7セクションで構成する。
-
-1. **役割定義(Role)**
-2. **ゴール定義抜粋(Goal Context)**
-3. **担当章情報(Chapter Assignment)**
-4. **参照すべきインベントリ項目(Inventory)**
-5. **作業指示(Task Instructions)**
-6. **出力フォーマット(Output Format)**
-7. **制約事項(Constraints)**
+Sub-agents operate in their own isolated context, so every piece of information they need must be in the prompt. At the same time, excessive information bloats the context and degrades accuracy. This document defines the "necessary and sufficient" line.
 
 ---
 
-## 完全版プロンプトテンプレート
+## Prompt structure
+
+The sub-agent prompt is composed of these 7 sections:
+
+1. **Role**
+2. **Goal Context** (excerpt)
+3. **Chapter Assignment**
+4. **Inventory** to reference
+5. **Task Instructions**
+6. **Output Format**
+7. **Constraints**
+
+---
+
+## Full prompt template
 
 ```
-あなたは仕様書の特定章を担当する調査エージェントです。
-担当章のドラフトを生成し、メインエージェントに完了報告してください。
+You are an investigation agent in charge of a specific chapter of the spec.
+Produce a draft of the assigned chapter and report completion to the main agent.
 
 ================================
-[1. 役割定義]
+[1. Role]
 ================================
-- 役割: 調査エージェント(章ドラフト生成)
-- メインエージェント: cc-rsg コーディネータ
-- 並列実行されている他エージェント数: {parallel_count}
-- 章間の整合性チェックは Phase 4 で別途実施されるため、
-  あなたは自分の担当章の精度に集中してください。
+- Role: investigation agent (chapter-draft author)
+- Main agent: cc-rsg coordinator
+- Number of other agents running in parallel: {parallel_count}
+- Cross-chapter consistency checks happen separately in Phase 4,
+  so focus on accuracy within your assigned chapter.
 
 ================================
-[2. ゴール定義抜粋]
+[2. Goal context (excerpt)]
 ================================
-- 主たる読者: {primary_reader}
+- Primary reader: {primary_reader}
   ({reader_description})
-- 読者がこの仕様書を読んだ後にすること: {reader_action}
-- 粒度希望: {granularity}
-- 重視する観点: {perspectives}
-- 既存資料: {existing_docs}
+- What the reader does after reading: {reader_action}
+- Desired granularity: {granularity}
+- Emphasised perspectives: {perspectives}
+- Existing documentation: {existing_docs}
 
-【粒度の解釈ガイド】
-- 高レベル概要: マクロ構造のみ。クラス内部のロジックには立ち入らない。
-- 中粒度: マクロ + ミドル単位(クラス・関数・エンドポイント)。メソッド単位の詳細は省略可。
-- 詳細: 全階層。設定値・しきい値も明記する。
+[Granularity interpretation]
+- High-level overview: macro structure only. Do not delve into class internals.
+- Medium: macro + middle units (classes, functions, endpoints). Method-level details may be omitted.
+- Detailed: all tiers. State configuration values and thresholds explicitly.
 
 ================================
-[3. 担当章情報]
+[3. Chapter assignment]
 ================================
-- 章ID: {chapter_id}
-- 章タイトル: {chapter_title}
-- 章の位置づけ(目次内): {chapter_position}
-- 出力ファイル名: {output_file_name}    ← メインエージェントが採番済。命名判断は禁止
-- テンプレート定義(該当章の構造):
+- Chapter ID: {chapter_id}
+- Chapter title: {chapter_title}
+- Position in the TOC: {chapter_position}
+- Output file name: {output_file_name}    ← already assigned by the main agent. Do NOT decide naming yourself.
+- Template definition (the structure of this chapter):
 {template_section_markdown}
 
 ================================
-[4. 参照すべきインベントリ項目]
+[4. Inventory items to reference]
 ================================
-以下のインベントリ項目があなたの担当章で扱うべきものです。
-各項目について、ソースコードを精読してください。
+The following inventory items are what your assigned chapter must cover.
+For each item, read the source code carefully.
 
 {inventory_items_json}
 
-例:
+Example:
 [
   {
     "id": "INV-042",
@@ -81,129 +81,129 @@ Phase 3でTaskツールを介して並列起動するサブエージェントへ
 ]
 
 ================================
-[5. 作業指示]
+[5. Task instructions]
 ================================
-1. 担当インベントリ項目に対応するソースコードを Read ツールで精読する。
-2. 必要に応じて Grep / Glob で関連コードを探索する。
-3. 章本文を Markdown で生成する。
-4. 各記述には [REF: file:lines] 形式で行番号付き参照を付ける。
-   - 例: 「ユーザーは退会後30日で物理削除される [REF: src/jobs/UserDeactivationJob.php:34-42]」
-5. 不確実性は隠蔽せず、以下マーカーを使用する。
-   - [CONFIDENCE: HIGH]   コードから確実に言える
-   - [CONFIDENCE: MED]    複数解釈の可能性があるが最有力解釈で記述
-   - [CONFIDENCE: LOW]    推測度が高い、要確認
-   - [ASK SME]            業務有識者への確認が必要
-   - [ASSUMED: {内容}; 根拠: {根拠}]   推測内容と根拠を明示
-   - [BLOCKED: see Q-XXX] critical な疑問のため空欄、Question Bank参照
-6. 章末尾に「この章で発生した詳細疑問」リストを付与する。
-   - 各疑問は以下のフォーマットで記述:
-     - Q: {疑問の本文}
-     - 根拠: {file:lines コード抜粋}
-     - カテゴリ: {7標準カテゴリのいずれか}
-     - 深刻度: critical / important / nice-to-have
-     - 推測: {現時点の推測内容}
+1. Use the Read tool to carefully read the source files corresponding to the assigned inventory items.
+2. As needed, use Grep / Glob to explore related code.
+3. Generate the chapter body in Markdown.
+4. For every statement, attach a `[REF: file:lines]` citation with precise line ranges.
+   - Example: "Users are physically deleted 30 days after withdrawal [REF: src/jobs/UserDeactivationJob.php:34-42]"
+5. Do not hide uncertainty; use these markers:
+   - [CONFIDENCE: HIGH]   reliably derivable from the code
+   - [CONFIDENCE: MED]    multiple interpretations are possible; written with the most likely one
+   - [CONFIDENCE: LOW]    high inference; needs confirmation
+   - [ASK SME]            requires confirmation from a subject-matter expert
+   - [ASSUMED: {content}; basis: {evidence}]   surface the inference and its basis
+   - [BLOCKED: see Q-XXX] left blank because of a critical question; see the Question Bank
+6. Append a "detail questions raised in this chapter" list at the end of the chapter.
+   - Each question follows this format:
+     - Q: {question body}
+     - Evidence: {file:lines code excerpt}
+     - Category: {one of the 7 standard categories}
+     - Severity: critical / important / nice-to-have
+     - Inference: {current best inference}
 
 ================================
-[6. 出力フォーマット]
+[6. Output format]
 ================================
-最終的に以下構造のMarkdownを返してください。`output_file_name` を含むフロントマターは必須です。
+Return Markdown shaped as follows. The frontmatter (including `output_file_name`) is mandatory.
 
 ---
 chapter_id: {chapter_id}
 chapter_title: {chapter_title}
 output_file_name: {output_file_name}
 generated_at: {ISO8601}
-references_count: {数値}
-questions_count: {数値}
+references_count: {number}
+questions_count: {number}
 blocked_sections: [{section_name}, ...]
 ---
 
 # {chapter_title}
 
-## (章本文をここに記述)
+## (chapter body here)
 
 ...
 
 ---
 
-## この章で発生した詳細疑問
+## Detail questions raised in this chapter
 
 ### Q-XXX (severity: important, category: business_rule)
-- 疑問: ...
-- 根拠: src/foo.php:34-42
+- Question: ...
+- Evidence: src/foo.php:34-42
   ```php
-  // コード抜粋
+  // code excerpt
   ```
-- 推測: ...
+- Inference: ...
 
 ### Q-YYY (severity: critical, category: architecture_decision)
 ...
 
 ================================
-[7. 制約事項]
+[7. Constraints]
 ================================
-- 推測と事実を混同しない。推測には必ず [ASSUMED] マーカーを付ける。
-- ゴール定義の粒度を超えた詳細記述はしない(冗長になるため)。
-- 担当外のインベントリ項目には言及しない(他エージェントの責務を侵さない)。
-- critical な疑問にぶつかった場合は当該節を [BLOCKED] として残し完了報告する。
-  全節を完璧に書こうとして停滞するより、書ける節を確実に書いて完了することを優先。
-- ファイル全体を Read する前に Grep で関連箇所を絞り込むこと。
-  対象ファイルが100行以下の場合は全体 Read で問題ない。
-- WebFetch / WebSearch は外部ライブラリの公式ドキュメント参照のみ使用可。
-  内部コード探索には使用しない。
-- 章本文の長さの目安: 中粒度なら200〜500行、詳細粒度なら500〜1500行。
-  これを大幅に超える場合は WBS 分割を見直す必要があるためメインに報告する。
-- **ファイル名は メインエージェントから渡された `{output_file_name}` を厳守する。**
-  自由に命名してはならない(`chapter2_architecture.md` のような独自命名は禁止)。
-  保存先は `drafts/{output_file_name}` で固定。
+- Never conflate inference with fact. Inference must always carry the [ASSUMED] marker.
+- Do not write detail beyond the goal granularity (verbosity hurts).
+- Do not mention inventory items outside your assignment (do not encroach on other sub-agents).
+- If you hit a critical question, leave the section as [BLOCKED] and report completion.
+  Better to ship the sections you can finish than to stall on perfection.
+- Before fully Read-ing a file, narrow it down with Grep first.
+  For files under 100 lines, a full Read is fine.
+- Use WebFetch / WebSearch only to consult the official docs of an external library.
+  Do NOT use them for internal code exploration.
+- Suggested chapter body length: medium → 200-500 lines; detailed → 500-1500 lines.
+  Exceeding this significantly means the WBS split needs to be revisited — report to the main agent.
+- **Use exactly the `{output_file_name}` handed down by the main agent.**
+  Free-form naming is forbidden (no `chapter2_architecture.md`-style names).
+  Save location is fixed at `drafts/{output_file_name}`.
 
 ================================
-[完了報告]
+[Completion report]
 ================================
-作業完了時、以下を返してください。
-1. 生成した章ドラフト(Markdown)
-2. 詳細疑問リスト(構造化)
-3. ブロックされた節がある場合、その一覧
-4. 想定外の状況に遭遇した場合、その内容
+When you finish, return:
+1. The generated chapter draft (Markdown).
+2. The detail-questions list (structured).
+3. If any sections are blocked, the list of them.
+4. Any unexpected situations you encountered.
 ```
 
 ---
 
-## プロンプト変数の充填例
+## Prompt-variable filling example
 
-メインエージェントは以下の変数をプロンプトに充填してサブエージェントを起動する。
+The main agent fills these variables when launching the sub-agent:
 
 ```python
 prompt_variables = {
     "parallel_count": 8,
-    "primary_reader": "メンテナンス開発者",
-    "reader_description": "コードベースを引き継いだ後任エンジニア",
-    "reader_action": "コード変更",
-    "granularity": "中粒度",
-    "perspectives": ["機能正確性", "運用性"],
-    "existing_docs": "なし",
+    "primary_reader": "Maintenance developer",
+    "reader_description": "Engineer who inherited the codebase",
+    "reader_action": "Code change",
+    "granularity": "medium",
+    "perspectives": ["functional_correctness", "operational"],
+    "existing_docs": "none",
     "chapter_id": "ch-04-routes",
-    "chapter_title": "ルート / エンドポイント一覧",
-    "chapter_position": "第4章 / 全8章中",
-    "output_file_name": "04-routes.md",   # ASCII slug 規約。サブエージェントは厳守
-    "template_section_markdown": "...(templates/web-app.md の該当章を抜粋)...",
+    "chapter_title": "Routes / endpoints",
+    "chapter_position": "Chapter 4 / 8",
+    "output_file_name": "04-routes.md",   # ASCII slug; the sub-agent obeys this strictly
+    "template_section_markdown": "...(excerpt of the relevant chapter from templates/web-app.md)...",
     "inventory_items_json": "[{...}, {...}, ...]"
 }
 ```
 
 ---
 
-## サブエージェントの動作モード
+## Sub-agent operating mode
 
-サブエージェントの判断ロジックは以下の擬似コードで動作する。
+The sub-agent's decision logic follows this pseudocode:
 
 ```python
 def investigate_chapter(prompt):
-    # 1. 担当インベントリ項目をすべて読み込む
+    # 1. Read every assigned inventory item
     for item in inventory_items:
         read_source(item.file, item.line)
 
-    # 2. 章本文を生成しつつ、疑問が湧いたら記録
+    # 2. Generate the body section by section; record questions as they arise
     questions = []
     for section in chapter_sections:
         try:
@@ -214,41 +214,41 @@ def investigate_chapter(prompt):
                 content = f"[BLOCKED: see {q.id}]"
             else:
                 content = generate_with_assumption(section, q)
-                # [CONFIDENCE: LOW; ASSUMED: ...] マーカー付き
+                # Marked with [CONFIDENCE: LOW; ASSUMED: ...]
 
-    # 3. 章末尾に疑問リストを付与
+    # 3. Append the question list at the end of the chapter
     return chapter_draft + format_questions(questions)
 ```
 
 ---
 
-## サブエージェントが避けるべき失敗パターン
+## Failure patterns the sub-agent must avoid
 
-### パターン1: 章を完璧に書こうとして停滞する
-- critical な疑問にぶつかったら [BLOCKED] で残し、書ける節を完成させる。
-- 全節を保留して何も書かないのは最悪のパターン。
+### Pattern 1: stalling while trying to write the chapter "perfectly"
+- When you hit a critical question, leave it as [BLOCKED] and finish the sections you can.
+- "Stall on everything and write nothing" is the worst pattern.
 
-### パターン2: 推測を事実として書く
-- 「おそらく」「と思われる」を地の文に混ぜると、後の読者が事実と推測を区別できない。
-- 必ず [CONFIDENCE: LOW] や [ASSUMED] マーカーを使用する。
+### Pattern 2: writing inference as fact
+- Mixing "probably" / "seems to" into the prose makes it impossible for later readers to tell fact from inference.
+- Always use [CONFIDENCE: LOW] or [ASSUMED] markers.
 
-### パターン3: トレーサビリティ参照を省略する
-- 章本文だけ書いて参照を付けないと、後の検証で「根拠不明」となる。
-- 1段落に最低1件は [REF:] を入れる。
+### Pattern 3: omitting traceability citations
+- Writing the body without citations leaves later verification with "no basis".
+- Put at least one `[REF:]` in every paragraph.
 
-### パターン4: 担当外まで踏み込む
-- 他章のインベントリ項目に詳細言及すると、章間で重複・矛盾が発生する。
-- 必要なら「→ 詳細はN章を参照」と書いて済ませる。
+### Pattern 4: stepping outside your assignment
+- Going deep into another chapter's inventory items causes overlap or contradictions between chapters.
+- When needed, just write "→ see Chapter N for details".
 
-### パターン5: ファイルを盲目的に全体Readする
-- 大きなファイル(1000行超)を全体Readするとcontextを圧迫する。
-- まず Grep で関連箇所を絞り、必要な行範囲だけ Read する。
+### Pattern 5: blindly Reading the whole file
+- Reading a large file (1000+ lines) in full bloats the context.
+- First narrow with Grep, then Read only the relevant line ranges.
 
 ---
 
-## メインエージェントによるサブエージェント起動コード例
+## Example sub-agent launch from the main agent
 
-擬似コード(Python風):
+Pseudocode (Python-like):
 
 ```python
 from collections import defaultdict
@@ -256,7 +256,7 @@ from collections import defaultdict
 def launch_subagents(wbs, goal, inventory):
     tasks = []
     for chapter in wbs.chapters:
-        # chapter.file_name は Phase 2 で確定済み(命名規約 ^(0\d|[1-9]\d)-[a-z0-9-]+\.md$)
+        # chapter.file_name was finalised in Phase 2 (naming regex ^(0\d|[1-9]\d)-[a-z0-9-]+\.md$)
         chapter_inventory = [
             item for item in inventory.items
             if item.id in chapter.assigned_inventory_ids
@@ -266,7 +266,7 @@ def launch_subagents(wbs, goal, inventory):
             goal=goal,
             inventory_items=chapter_inventory,
             parallel_count=len(wbs.chapters),
-            output_file_name=chapter.file_name,    # 必須: サブエージェントへ伝達
+            output_file_name=chapter.file_name,    # required: handed to the sub-agent
         )
         task = Task(
             description=f"Investigate chapter: {chapter.chapter_title}",
@@ -275,10 +275,10 @@ def launch_subagents(wbs, goal, inventory):
         )
         tasks.append(task)
 
-    # 並列起動
+    # Parallel launch
     results = run_in_parallel(tasks)
 
-    # 結果集約: ファイル名は wbs.json で確定したもののみを使用(自由命名禁止)
+    # Aggregate results; only file names finalised in wbs.json are used (free naming forbidden)
     for result, chapter in zip(results, wbs.chapters):
         save_draft(f"drafts/{chapter.file_name}", result.markdown)
         merge_questions(result.questions)
@@ -288,15 +288,15 @@ def launch_subagents(wbs, goal, inventory):
 
 ---
 
-## サブエージェント実行後の品質チェック
+## Post-execution quality check
 
-メインエージェントは各サブエージェントの結果に対して以下を確認する。
+The main agent confirms the following on every sub-agent result:
 
-- [ ] フロントマター(`chapter_id`, `chapter_title`, `output_file_name`, `references_count` 等)が揃っているか
-- [ ] `output_file_name` が `wbs.json.chapters[].file_name` と一致しているか(逸脱は再実行)
-- [ ] `references_count` が0の場合、サブエージェントに再実行を指示する(根拠なし章は不可)
-- [ ] `blocked_sections` がある場合、Question Bankに対応エントリが登録されているか
-- [ ] 章本文に Markdown構文エラーがないか(コードブロックの閉じ忘れ等)
-- [ ] 担当外のインベントリ項目への詳細言及がないか(grep でクロスチェック)
+- [ ] Frontmatter (`chapter_id`, `chapter_title`, `output_file_name`, `references_count`, etc.) is present.
+- [ ] `output_file_name` matches `wbs.json.chapters[].file_name` (deviations trigger re-run).
+- [ ] `references_count` is non-zero (a chapter without basis is invalid; re-run if zero).
+- [ ] If `blocked_sections` is non-empty, the Question Bank contains corresponding entries.
+- [ ] No Markdown syntax errors in the body (e.g. unclosed code blocks).
+- [ ] No detail mentions of out-of-scope inventory items (cross-check with grep).
 
-これらの品質チェックに失敗したサブエージェント結果は再実行 or 手動修正対象とする。
+Sub-agent results that fail these checks are re-run or sent to manual correction.

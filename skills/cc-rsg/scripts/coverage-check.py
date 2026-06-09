@@ -2,29 +2,31 @@
 """
 cc-rsg coverage-check.py
 
-Phase 4 (Verify) で実行する検証スクリプト。
-インベントリ言及だけでなく、各章の品質指標 (REF 数 / 行数 / コードブロック数 / Mermaid 図数 /
-Sources Read セクション等) と Question Bank の整合性、MECE 検査、outline モードでの
-全 entity 列挙チェックを一括で実施する。
+Verification script for Phase 4 (Verify). Checks not only inventory
+mentions but also per-chapter quality metrics (REF count, body line
+count, code-block count, Mermaid count, Sources Read section, etc.),
+Question Bank integrity, MECE coverage, and outline-mode entity
+enumeration in a single pass.
 
-以下を検証する:
+Checks performed:
 
-1.  各章の `[REF: path:Lstart-Lend]` 数 (`--min-refs-per-chapter`)
-2.  各章の本文行数 (`--min-lines-per-chapter`)
-3.  各章の fenced code block 数 (`--min-code-blocks-per-chapter`)
-4.  各章の Mermaid 図数 (`--min-mermaid-per-chapter`)
-5.  各章冒頭の `## Sources Read` セクションのファイル数 (`--min-sources-read-per-chapter`)
-6.  inventory.json 総数の自動最小値 = max(50, file_count // 20)  (`--min-inventory`)
-7.  controller_group 等のグルーピング型 INV の比率上限 (`--max-macro-ratio`)
-8.  questions.json 総件数 (`--min-questions`)
-9.  Phase 5 経過後の `status: open` 比率上限 (`--max-open-ratio`)
-10. inventory.covered_by 充填率 (`--min-covered-by-fill`)
-11. MECE 検査 (`.cc-rsg/trace.json` を参照、`--min-mece-coverage`)
+1.  `[REF: path:Lstart-Lend]` count per chapter (`--min-refs-per-chapter`)
+2.  Body-line count per chapter (`--min-lines-per-chapter`)
+3.  Fenced-code-block count per chapter (`--min-code-blocks-per-chapter`)
+4.  Mermaid-diagram count per chapter (`--min-mermaid-per-chapter`)
+5.  Number of files under the `## Sources Read` section of each chapter (`--min-sources-read-per-chapter`)
+6.  Auto-derived minimum inventory size = max(50, file_count // 20)  (`--min-inventory`)
+7.  Upper bound on the ratio of grouping-style INVs like controller_group (`--max-macro-ratio`)
+8.  Total `questions.json` count (`--min-questions`)
+9.  Upper bound on the `status: open` ratio after Phase 5 (`--max-open-ratio`)
+10. inventory.covered_by fill rate (`--min-covered-by-fill`)
+11. MECE check (consults `.cc-rsg/trace.json`, `--min-mece-coverage`)
 
-旧版互換のため `--fail-on-uncovered` `--strict` `--output-format` は維持。
-新しい検査群は全て exit 1 で fail を返す。閾値はすべて CLI 引数で上書き可能。
+`--fail-on-uncovered` `--strict` `--output-format` remain for backward
+compatibility. Every quality check returns exit 1 on failure. All
+thresholds are overridable via CLI flags.
 
-使い方:
+Usage:
     python coverage-check.py \\
       --cc-rsg-dir .cc-rsg \\
       --target-dir-for-required final \\
@@ -41,9 +43,9 @@ Sources Read セクション等) と Question Bank の整合性、MECE 検査、
       --min-mece-coverage 0.7
 
 Exit codes:
-    0 = すべての検査 PASS
-    1 = 1つ以上の検査 FAIL
-    2 = inventory.json 等の必須ファイル読込エラー
+    0 = all checks PASS
+    1 = one or more checks FAILED
+    2 = required file (e.g. inventory.json) could not be loaded
 """
 
 from __future__ import annotations
@@ -58,26 +60,26 @@ from typing import Any
 
 
 # ----------------------------------------------------------------------------
-# 章ファイル命名規約
+# Chapter-file naming convention
 # ----------------------------------------------------------------------------
 
 NAMING_PATTERN = re.compile(r"^(0\d|[1-9]\d)-[a-z0-9-]+\.md$")
 NAMING_EXEMPT = {"traceability.md", "README.md"}
 REQUIRED_FILES = ("00-metadata.md", "99-unresolved.md", "traceability.md")
 
-# 章本文内の正規表現
+# Regexes used in chapter bodies
 REF_RE = re.compile(r"\[REF:\s*([^:\]]+):(\d+)(?:-(\d+))?\]")
 CODE_FENCE_RE = re.compile(r"^```([a-zA-Z0-9_-]+)?")
 MERMAID_FENCE_RE = re.compile(r"^```mermaid\b")
 SOURCES_READ_RE = re.compile(r"^##+\s*Sources\s*Read\b", re.IGNORECASE)
 SOURCES_READ_ITEM_RE = re.compile(r"^\s*[-*]\s+`?([^`\n]+?)`?(?:\s*\([^)]*\))?\s*$")
 
-# macro 系 INV と見なすキーワード（type フィールドに含まれる）
+# Keywords that make an INV count as "macro" (matched against the `type` field)
 MACRO_TYPE_KEYWORDS = ("group", "module", "domain", "category", "bundle", "section")
 
 
 # ----------------------------------------------------------------------------
-# データクラス
+# Data classes
 # ----------------------------------------------------------------------------
 
 @dataclass
@@ -104,7 +106,7 @@ class ChapterMetrics:
 
 @dataclass
 class CoverageReport:
-    # 旧版互換
+    # backward compatibility
     total_inventory: int = 0
     covered: int = 0
     uncovered: list[InventoryItem] = field(default_factory=list)
@@ -117,7 +119,7 @@ class CoverageReport:
     naming_warnings: list[str] = field(default_factory=list)
     missing_required: list[str] = field(default_factory=list)
     target_dir_for_required: str = ""
-    # 新規
+    # extended fields
     chapter_metrics: list[ChapterMetrics] = field(default_factory=list)
     inventory_required_min: int = 0
     macro_inventory_ratio: float = 0.0
@@ -131,7 +133,7 @@ class CoverageReport:
     mece_passed_strict: bool = True
     mece_coverage_rate: float = 0.0
     gate_failures: list[str] = field(default_factory=list)
-    # outline / interactive 用
+    # outline / interactive support
     depth_mode: str = "comprehensive"
     confidence_verified: int = 0
     confidence_inferred: int = 0
@@ -139,7 +141,7 @@ class CoverageReport:
 
 
 # ----------------------------------------------------------------------------
-# ローダ
+# Loaders
 # ----------------------------------------------------------------------------
 
 def load_inventory(path: Path) -> list[InventoryItem]:
@@ -173,7 +175,7 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
 
 
 def load_source_map_count(cc_rsg_dir: Path) -> int | None:
-    """source-map.json があれば対象ファイル総数を返す（min-inventory auto 算出用）。"""
+    """Return the total file count from source-map.json if available (used by min-inventory auto)."""
     sm = cc_rsg_dir / "source-map.json"
     if not sm.exists():
         return None
@@ -192,7 +194,7 @@ def load_trace(cc_rsg_dir: Path) -> dict[str, Any] | None:
 
 
 def scan_chapter_files(target_dir: Path) -> dict[str, str]:
-    """対象ディレクトリ直下の .md ファイル名 → 内容 マップ。"""
+    """Return a `name → content` map of the .md files directly under the target directory."""
     if not target_dir.exists() or not target_dir.is_dir():
         return {}
     out: dict[str, str] = {}
@@ -205,14 +207,14 @@ def scan_chapter_files(target_dir: Path) -> dict[str, str]:
 
 
 # ----------------------------------------------------------------------------
-# 章メトリクス算出
+# Chapter-metric computation
 # ----------------------------------------------------------------------------
 
 def compute_chapter_metrics(name: str, content: str) -> ChapterMetrics:
     raw_lines = content.splitlines()
     total = len(raw_lines)
 
-    # 本文行 = 空行・コードフェンス・自動生成コメント を除いた行数
+    # Body lines = lines excluding blanks, code fences, and auto-generated comments.
     in_code = False
     body_lines = 0
     code_blocks = 0
@@ -236,7 +238,7 @@ def compute_chapter_metrics(name: str, content: str) -> ChapterMetrics:
             continue
         stripped = line.strip()
         if not stripped:
-            in_sources_read = False  # 空行で Sources Read セクション終了
+            in_sources_read = False  # a blank line ends the Sources Read section
             continue
         if SOURCES_READ_RE.match(line):
             in_sources_read = True
@@ -245,7 +247,7 @@ def compute_chapter_metrics(name: str, content: str) -> ChapterMetrics:
             if SOURCES_READ_ITEM_RE.match(line):
                 sources_read_count += 1
             else:
-                # 次の見出しが来たら終了
+                # End when the next heading appears.
                 if line.startswith("#"):
                     in_sources_read = False
             continue
@@ -272,27 +274,27 @@ def evaluate_chapter_gates(
     min_mermaid: int,
     min_sources_read: int,
 ) -> None:
-    """各 ChapterMetrics に failures を populate する（章閾値違反）。"""
+    """Populate `failures` on each ChapterMetrics (per-chapter threshold violations)."""
     skipped_files = {"00-metadata.md", "99-unresolved.md", "traceability.md", "README.md"}
     for m in metrics:
         if m.file in skipped_files:
             continue
         if m.refs < min_refs:
-            m.failures.append(f"[REF:] が {m.refs} 個 < {min_refs} 個必要")
+            m.failures.append(f"[REF:] count is {m.refs} < required {min_refs}")
         if m.body_lines < min_lines:
-            m.failures.append(f"本文行 {m.body_lines} 行 < {min_lines} 行必要")
+            m.failures.append(f"body lines {m.body_lines} < required {min_lines}")
         if m.code_blocks < min_code_blocks:
-            m.failures.append(f"コードブロック {m.code_blocks} 個 < {min_code_blocks} 個必要")
+            m.failures.append(f"code blocks {m.code_blocks} < required {min_code_blocks}")
         if m.mermaid_blocks < min_mermaid:
-            m.failures.append(f"Mermaid {m.mermaid_blocks} 個 < {min_mermaid} 個必要")
+            m.failures.append(f"Mermaid diagrams {m.mermaid_blocks} < required {min_mermaid}")
         if m.sources_read_count < min_sources_read:
             m.failures.append(
-                f"Sources Read 項目 {m.sources_read_count} 件 < {min_sources_read} 件必要"
+                f"Sources Read items {m.sources_read_count} < required {min_sources_read}"
             )
 
 
 # ----------------------------------------------------------------------------
-# 既存ロジック（macro比率・命名・INV mentioned 等）
+# Existing logic (macro ratio, naming, INV mention check, etc.)
 # ----------------------------------------------------------------------------
 
 def detect_mentions(item: InventoryItem, drafts: dict[str, str]) -> list[str]:
@@ -331,21 +333,21 @@ def check_question_integrity(
         question_ids.add(qid)
         missing = required_fields - set(q.keys())
         if missing:
-            issues.append(f"{qid}: 必須フィールド不足: {sorted(missing)}")
+            issues.append(f"{qid}: missing required fields: {sorted(missing)}")
         sev = q.get("severity")
         if sev and sev not in valid_severities:
-            issues.append(f"{qid}: 不正な severity 値: {sev}")
+            issues.append(f"{qid}: invalid severity value: {sev}")
         st = q.get("status")
         if st and st not in valid_statuses:
-            issues.append(f"{qid}: 不正な status 値: {st}")
+            issues.append(f"{qid}: invalid status value: {st}")
         if st == "answered":
             if not q.get("answer"):
-                issues.append(f"{qid}: status=answered だが answer が空")
+                issues.append(f"{qid}: status=answered but `answer` is empty")
         related_inv = q.get("related_inventory_ids", []) or []
         for inv_id in related_inv:
             if inv_id not in inventory_ids:
                 issues.append(
-                    f"{qid}: related_inventory_ids の {inv_id} が inventory.json に存在しない"
+                    f"{qid}: related_inventory_ids entry {inv_id} not found in inventory.json"
                 )
 
     blocked_pattern = re.compile(r"\[BLOCKED:\s*see\s+(Q-[A-Za-z0-9_-]+)\]")
@@ -354,7 +356,7 @@ def check_question_integrity(
         for match in blocked_pattern.finditer(content):
             ref_id = match.group(1)
             if ref_id not in question_ids:
-                issues.append(f"draft 内 [BLOCKED: see {ref_id}] が questions.json に存在しない")
+                issues.append(f"draft contains [BLOCKED: see {ref_id}] but the question is missing from questions.json")
             else:
                 blocked_referenced.append(ref_id)
 
@@ -370,7 +372,7 @@ def check_naming_convention(drafts_dir: Path) -> list[str]:
             continue
         if not NAMING_PATTERN.match(f.name):
             warnings.append(
-                f"{f.name} は命名規約 ({NAMING_PATTERN.pattern}) または予約 {sorted(NAMING_EXEMPT)} に違反"
+                f"{f.name} violates the naming convention ({NAMING_PATTERN.pattern}) and is not in the reserved list {sorted(NAMING_EXEMPT)}"
             )
     return warnings
 
@@ -378,15 +380,15 @@ def check_naming_convention(drafts_dir: Path) -> list[str]:
 def check_required_files(target_dir: Path) -> list[str]:
     missing: list[str] = []
     if not target_dir.exists():
-        return [f"対象ディレクトリ {target_dir} が存在しない"]
+        return [f"target directory {target_dir} does not exist"]
     for required in REQUIRED_FILES:
         if not (target_dir / required).exists():
-            missing.append(f"必須ファイル {required} が {target_dir} に存在しない")
+            missing.append(f"required file {required} is missing from {target_dir}")
     return missing
 
 
 # ----------------------------------------------------------------------------
-# レポート構築
+# Report construction
 # ----------------------------------------------------------------------------
 
 def detect_depth_mode(cc_rsg_dir: Path) -> str:
@@ -436,10 +438,10 @@ def build_report(
 
     depth_mode = detect_depth_mode(cc_rsg_dir)
 
-    # 旧版互換: 言及検出
+    # v1 compatibility: mention detection
     uncovered: list[InventoryItem] = []
     for item in inventory:
-        # covered_by 既存値があれば優先（agent が手動充填した場合）
+        # Use any existing covered_by values (set by the agent if filled manually).
         if not item.covered_by:
             item.covered_by = detect_mentions(item, chapters)
         if not item.covered_by:
@@ -452,15 +454,15 @@ def build_report(
     naming_warnings = check_naming_convention(target_dir)
     missing_required = check_required_files(target_dir)
 
-    # 章メトリクス
+    # Chapter metrics
     chapter_metrics: list[ChapterMetrics] = []
     for name, content in chapters.items():
         chapter_metrics.append(compute_chapter_metrics(name, content))
 
-    # outline / interactive モードでは comprehensive 用の章ゲート(200行 / REF 10件 /
-    # コードブロック / Mermaid / Sources Read 5件) は撤廃。代わりに「全 entity が
-    # 表のいずれかの行に存在するか」を MECE 検査基準にする(下の uncovered ロジック
-    # を流用)。
+    # In outline / interactive mode the comprehensive-mode chapter gates
+    # (200 lines / 10 REFs / code blocks / Mermaid / 5 Sources Read) are
+    # dropped. Instead, the MECE criterion is "every entity appears in
+    # some row of some table" — reuse the uncovered logic below.
     if depth_mode == "comprehensive":
         evaluate_chapter_gates(
             chapter_metrics,
@@ -478,11 +480,11 @@ def build_report(
     else:
         required_min = int(min_inventory)
 
-    # macro 比率
+    # Macro ratio
     macro_count = sum(1 for it in inventory if is_macro_type(it))
     macro_ratio = (macro_count / len(inventory)) if inventory else 0.0
 
-    # covered_by 充填率
+    # covered_by fill rate
     covered_by_filled = sum(1 for it in inventory if it.covered_by)
     covered_by_fill_rate = (covered_by_filled / len(inventory)) if inventory else 0.0
 
@@ -504,64 +506,64 @@ def build_report(
         mece_rate = mece_covered / denom
         mece_passed = mece_uncovered == 0
 
-    # ゲート評価
+    # Gate evaluation
     gate_failures: list[str] = []
     if len(inventory) < required_min:
         gate_failures.append(
-            f"inventory.json 件数 {len(inventory)} < 最低 {required_min} 件 "
-            f"(コードベース規模に対して粒度不足の可能性)"
+            f"inventory.json size {len(inventory)} < required {required_min} "
+            f"(may be under-granular for the codebase size)"
         )
     if macro_ratio > max_macro_ratio:
         gate_failures.append(
-            f"macro 型 INV 比率 {macro_ratio:.1%} > 上限 {max_macro_ratio:.1%} "
-            f"({macro_count}/{len(inventory)} 件が group/module 系。粒度を細分化してください)"
+            f"macro-type INV ratio {macro_ratio:.1%} > cap {max_macro_ratio:.1%} "
+            f"({macro_count}/{len(inventory)} are group/module-style — please subdivide)"
         )
     if covered_by_fill_rate < min_covered_by_fill:
         gate_failures.append(
-            f"inventory.covered_by 充填率 {covered_by_fill_rate:.1%} < {min_covered_by_fill:.1%}"
+            f"inventory.covered_by fill rate {covered_by_fill_rate:.1%} < {min_covered_by_fill:.1%}"
         )
     if len(questions) < min_questions:
         gate_failures.append(
-            f"questions.json 件数 {len(questions)} < 最低 {min_questions} 件 "
-            f"(Phase 5 対話のため疑問を増やしてください)"
+            f"questions.json size {len(questions)} < required {min_questions} "
+            f"(raise more questions for Phase 5 dialogue)"
         )
     if questions and open_ratio > max_open_ratio:
         gate_failures.append(
-            f"open status 比率 {open_ratio:.1%} > 上限 {max_open_ratio:.1%} "
-            f"(Phase 5 三段階対話を完遂してください)"
+            f"open-status ratio {open_ratio:.1%} > cap {max_open_ratio:.1%} "
+            f"(complete the Phase 5 three-stage dialogue)"
         )
     if trace is not None and mece_rate < min_mece_coverage:
         gate_failures.append(
-            f"MECE カバレッジ {mece_rate:.1%} < {min_mece_coverage:.1%} "
+            f"MECE coverage {mece_rate:.1%} < {min_mece_coverage:.1%} "
             f"(uncovered={mece_uncovered}/{mece_total - mece_excluded})"
         )
     if trace is None:
         gate_failures.append(
-            "trace.json が無い。build-trace.py を実行して MECE 検査を有効化してください"
+            "trace.json missing. Run build-trace.py to enable the MECE check."
         )
 
-    # 章メトリクス fail を全体 fail にも反映
+    # Reflect per-chapter metric failures into the overall gate failures.
     for m in chapter_metrics:
         if m.failures:
             for f in m.failures:
-                gate_failures.append(f"章 {m.file}: {f}")
+                gate_failures.append(f"chapter {m.file}: {f}")
 
-    # outline / interactive モードの confidence ラベル集計
-    # 章本文に 🟢 VERIFIED / 🟡 INFERRED / 🔴 ASSUMED が何回出るかを数える
+    # Aggregate confidence labels for outline / interactive mode.
+    # Count how many times 🟢 VERIFIED / 🟡 INFERRED / 🔴 ASSUMED appear in chapter bodies.
     verified = inferred = assumed = 0
     if depth_mode != "comprehensive":
         for _, content in chapters.items():
             verified += content.count("🟢") + content.count("VERIFIED")
             inferred += content.count("🟡") + content.count("INFERRED")
             assumed  += content.count("🔴") + content.count("ASSUMED")
-        # ASSUMED 比率が高すぎる場合は警告
+        # Warn if the ASSUMED ratio is too high.
         total_labels = verified + inferred + assumed
         if total_labels > 0:
             assumed_ratio = assumed / total_labels
             if assumed_ratio > 0.6:
                 gate_failures.append(
-                    f"[outline] ASSUMED 比率が {assumed_ratio:.0%} "
-                    f"(60% 超) — 機械抽出による grounding を強化してください"
+                    f"[outline] ASSUMED ratio is {assumed_ratio:.0%} "
+                    f"(over 60%) — strengthen grounding via mechanical extraction"
                 )
 
     total = len(inventory)
@@ -601,14 +603,14 @@ def build_report(
 
 
 # ----------------------------------------------------------------------------
-# レンダリング
+# Rendering
 # ----------------------------------------------------------------------------
 
 def render_text(report: CoverageReport) -> str:
     lines: list[str] = []
-    lines.append("=== cc-rsg Phase 4 検証レポート ===")
+    lines.append("=== cc-rsg Phase 4 verification report ===")
     lines.append("")
-    lines.append(f"【depth モード】 {report.depth_mode}")
+    lines.append(f"[Depth mode] {report.depth_mode}")
     if report.depth_mode != "comprehensive":
         total_labels = (
             report.confidence_verified
@@ -625,39 +627,39 @@ def render_text(report: CoverageReport) -> str:
                 f"🔴 ASSUMED {report.confidence_assumed} ({a_pct:.0f}%)"
             )
         else:
-            lines.append("  Confidence KPI: ラベル未検出 — 各表セルに 🟢/🟡/🔴 を付与してください")
+            lines.append("  Confidence KPI: no labels detected — attach 🟢/🟡/🔴 to each table cell")
     lines.append("")
-    lines.append("【インベントリカバレッジ】")
-    lines.append(f"- 全 inventory 項目: {report.total_inventory} 件 (必要最低: {report.inventory_required_min} 件)")
-    lines.append(f"- 言及あり: {report.covered} 件 ({report.coverage_rate:.1f}%)")
-    lines.append(f"- 未言及: {len(report.uncovered)} 件")
-    lines.append(f"- macro 型: {report.macro_inventory_count} 件 ({report.macro_inventory_ratio:.1%})")
-    lines.append(f"- covered_by 充填率: {report.covered_by_fill_rate:.1%}")
+    lines.append("[Inventory coverage]")
+    lines.append(f"- Total inventory items: {report.total_inventory} (required minimum: {report.inventory_required_min})")
+    lines.append(f"- Mentioned: {report.covered} ({report.coverage_rate:.1f}%)")
+    lines.append(f"- Unmentioned: {len(report.uncovered)}")
+    lines.append(f"- Macro type: {report.macro_inventory_count} ({report.macro_inventory_ratio:.1%})")
+    lines.append(f"- covered_by fill rate: {report.covered_by_fill_rate:.1%}")
     lines.append("")
-    lines.append("【MECE 検査】")
+    lines.append("[MECE check]")
     if report.mece_total > 0:
-        lines.append(f"- ソースユニット総数: {report.mece_total}")
-        lines.append(f"- 仕様書でカバー: {report.mece_covered} ({report.mece_coverage_rate:.1%})")
-        lines.append(f"- 明示的除外: {report.mece_excluded}")
-        lines.append(f"- 未カバー: {report.mece_uncovered}")
+        lines.append(f"- Total source units: {report.mece_total}")
+        lines.append(f"- Covered by the spec: {report.mece_covered} ({report.mece_coverage_rate:.1%})")
+        lines.append(f"- Explicitly excluded: {report.mece_excluded}")
+        lines.append(f"- Uncovered: {report.mece_uncovered}")
     else:
-        lines.append("- trace.json が無いため MECE 未検査")
+        lines.append("- trace.json missing; MECE check not performed")
     lines.append("")
-    lines.append("【Question Bank】")
-    lines.append(f"- 全件数: {report.questions_total}")
-    lines.append(f"- open 残: {report.questions_open} ({report.open_question_ratio:.1%})")
+    lines.append("[Question Bank]")
+    lines.append(f"- Total: {report.questions_total}")
+    lines.append(f"- Open remaining: {report.questions_open} ({report.open_question_ratio:.1%})")
     lines.append("")
-    lines.append("【章ごとの品質メトリクス】")
+    lines.append("[Per-chapter quality metrics]")
     for m in report.chapter_metrics:
         flag = "❌" if m.failures else "✅"
         lines.append(
-            f"  {flag} {m.file}: body={m.body_lines}行 refs={m.refs} "
+            f"  {flag} {m.file}: body={m.body_lines} lines, refs={m.refs} "
             f"code={m.code_blocks} mermaid={m.mermaid_blocks} sources_read={m.sources_read_count}"
         )
         for f in m.failures:
             lines.append(f"      - {f}")
     lines.append("")
-    lines.append("【ゲート判定】")
+    lines.append("[Gate decision]")
     if not report.gate_failures and not report.missing_required:
         lines.append("- ✅ ALL PASSED")
     else:
@@ -719,7 +721,7 @@ def main() -> int:
     p.add_argument("--target-dir-for-required", default="final", choices=["drafts", "final"])
     p.add_argument("--output-format", choices=["text", "json"], default="text")
 
-    # 章閾値
+    # Per-chapter thresholds
     p.add_argument("--min-refs-per-chapter", type=int, default=10)
     p.add_argument("--min-lines-per-chapter", type=int, default=200)
     p.add_argument("--min-code-blocks-per-chapter", type=int, default=3)
@@ -728,14 +730,14 @@ def main() -> int:
 
     # inventory / questions / MECE
     p.add_argument("--min-inventory", default="auto",
-                   help='件数の最低値。"auto" で max(50, files_scanned/20) を計算')
+                   help='Minimum item count. With "auto", compute max(50, files_scanned/20).')
     p.add_argument("--max-macro-ratio", type=float, default=0.2)
     p.add_argument("--min-questions", type=int, default=10)
     p.add_argument("--max-open-ratio", type=float, default=0.2)
     p.add_argument("--min-covered-by-fill", type=float, default=0.9)
     p.add_argument("--min-mece-coverage", type=float, default=0.7)
 
-    # 旧版互換
+    # v1 compatibility
     p.add_argument("--fail-on-uncovered", action="store_true")
     p.add_argument("--strict", action="store_true")
 
@@ -758,7 +760,7 @@ def main() -> int:
             min_mece_coverage=args.min_mece_coverage,
         )
     except FileNotFoundError as e:
-        print(f"エラー: {e}", file=sys.stderr)
+        print(f"ERROR: {e}", file=sys.stderr)
         return 2
 
     if args.output_format == "json":
@@ -766,7 +768,7 @@ def main() -> int:
     else:
         print(render_text(report))
 
-    # 必須ファイル欠落・ゲート failure は exit 1
+    # Missing required files or any gate failure → exit 1.
     if report.missing_required:
         return 1
     if report.gate_failures:

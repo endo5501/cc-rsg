@@ -2,17 +2,18 @@
 """
 cc-rsg build-traceability.py
 
-`.cc-rsg/trace.json` を読み込み、人間が読める `final/traceability.md`
-（または `drafts/traceability.md`）を自動生成する。
+Reads `.cc-rsg/trace.json` and auto-generates a human-readable
+`final/traceability.md` (or `drafts/traceability.md`).
 
-これにより:
-- 章 → ソース対応表
-- ソース → 章対応表
-- MECE 検査結果（カバー率・除外内訳）
+Produces:
+- Chapter → Source mapping table
+- Source → Chapter mapping table
+- MECE check result (coverage rate, exclusion breakdown)
 
-をユーザーが Markdown 1 枚で確認できる。手書きさせない。
+so the user can see everything in a single Markdown file. Never write it
+by hand.
 
-使い方:
+Usage:
     python build-traceability.py --cc-rsg-dir .cc-rsg --output-dir final
 """
 
@@ -61,22 +62,22 @@ def main(argv: list[str] | None = None) -> int:
     lines.append("# Traceability")
     lines.append("")
     lines.append(
-        f"<!-- 自動生成: {datetime.now(timezone.utc).isoformat()} | source: trace.json -->"
+        f"<!-- auto-generated: {datetime.now(timezone.utc).isoformat()} | source: trace.json -->"
     )
     lines.append("")
-    lines.append("## MECE 検査結果")
+    lines.append("## MECE check result")
     lines.append("")
-    lines.append(f"- 抽出されたソースユニット総数: **{total}**")
-    lines.append(f"- 仕様書でカバー: **{covered} ({coverage_rate:.1f}%)**")
-    lines.append(f"- 明示的除外: **{excluded}**")
+    lines.append(f"- Total extracted source units: **{total}**")
+    lines.append(f"- Covered by the spec: **{covered} ({coverage_rate:.1f}%)**")
+    lines.append(f"- Explicitly excluded: **{excluded}**")
     status_mark = "✅ PASSED" if mece_ok else "❌ FAILED"
-    lines.append(f"- 未カバー: **{uncovered}** {status_mark}")
+    lines.append(f"- Uncovered: **{uncovered}** {status_mark}")
     lines.append("")
 
     if uncovered:
-        lines.append("### 未カバー一覧（要対応）")
+        lines.append("### Uncovered list (action required)")
         lines.append("")
-        lines.append("| SRC ID | パス | 行範囲 | kind | name |")
+        lines.append("| SRC ID | path | line range | kind | name |")
         lines.append("|--------|------|--------|------|------|")
         for sid in trace.get("uncovered_units", []):
             u = trace["by_source"].get(sid, {})
@@ -87,26 +88,26 @@ def main(argv: list[str] | None = None) -> int:
             )
         lines.append("")
 
-    # 除外内訳
+    # Exclusion breakdown
     excluded_units = [
         (sid, u) for sid, u in trace["by_source"].items() if u.get("excluded")
     ]
     if excluded_units:
-        lines.append("### 明示的除外内訳")
+        lines.append("### Explicit-exclusion breakdown")
         lines.append("")
-        lines.append("| SRC ID | パス | 除外理由 |")
+        lines.append("| SRC ID | path | exclusion reason |")
         lines.append("|--------|------|---------|")
         for sid, u in excluded_units:
             reason = u.get("excluded_reason") or "(no reason given)"
             lines.append(f"| {sid} | `{u.get('path','')}` | {reason} |")
         lines.append("")
 
-    # 章 → ソース対応表
-    lines.append("## 章 → ソース対応表")
+    # Chapter → Source mapping table
+    lines.append("## Chapter → Source mapping")
     lines.append("")
     by_section = trace.get("by_section", {})
     if by_section:
-        # ファイル名と セクション名 でグループ化
+        # Group by file name and section name
         sections_by_file: dict[str, list[tuple[str, list[str]]]] = defaultdict(list)
         for key, src_ids in by_section.items():
             if "::" in key:
@@ -120,20 +121,20 @@ def main(argv: list[str] | None = None) -> int:
             lines.append("")
             for section, src_ids in sections_by_file[file_name]:
                 src_descs = []
-                for sid in src_ids[:50]:  # 章あたり50件まで
+                for sid in src_ids[:50]:  # up to 50 per chapter
                     u = trace["by_source"].get(sid, {})
                     lr = u.get("line_range", [0, 0])
                     p = u.get("path", "")
                     src_descs.append(f"{sid} (`{Path(p).name}:{lr[0]}-{lr[1]}`)")
-                more = f" ... 他 {len(src_ids)-50} 件" if len(src_ids) > 50 else ""
+                more = f" ... and {len(src_ids)-50} more" if len(src_ids) > 50 else ""
                 lines.append(f"- **{section}** — {', '.join(src_descs)}{more}")
             lines.append("")
     else:
-        lines.append("_(参照が記録されていません)_")
+        lines.append("_(no citations recorded)_")
         lines.append("")
 
-    # ソース → 章対応表
-    lines.append("## ソース → 章対応表（ファイル別）")
+    # Source → Chapter mapping table
+    lines.append("## Source → Chapter mapping (by file)")
     lines.append("")
     by_source = trace.get("by_source", {})
     grouped_by_path: dict[str, list[tuple[str, dict]]] = defaultdict(list)
@@ -142,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for path in sorted(grouped_by_path):
         sids = grouped_by_path[path]
-        # 全 SRC が covered_by_sections 空かつ excluded ならスキップ表示
+        # Skip display when all SRC have empty covered_by_sections and are excluded
         all_empty = all(
             not u.get("covered_by_sections") and not u.get("excluded")
             for _, u in sids
@@ -160,18 +161,18 @@ def main(argv: list[str] | None = None) -> int:
                 where = ", ".join(
                     f"{c.get('file','')} §{c.get('section','')}" for c in covered_by[:5]
                 )
-                more = f" (他 {len(covered_by)-5}件)" if len(covered_by) > 5 else ""
+                more = f" (and {len(covered_by)-5} more)" if len(covered_by) > 5 else ""
                 lines.append(
                     f"- **{sid}** ({kind} `{name}` lines {lr[0]}-{lr[1]}) → {where}{more}"
                 )
             elif u.get("excluded"):
                 lines.append(
                     f"- ~~{sid}~~ ({kind} `{name}` lines {lr[0]}-{lr[1]}) "
-                    f"— **除外**: {u.get('excluded_reason','')}"
+                    f"— **excluded**: {u.get('excluded_reason','')}"
                 )
             else:
                 lines.append(
-                    f"- ⚠️ **{sid}** ({kind} `{name}` lines {lr[0]}-{lr[1]}) — **未カバー**"
+                    f"- ⚠️ **{sid}** ({kind} `{name}` lines {lr[0]}-{lr[1]}) — **UNCOVERED**"
                 )
         lines.append("")
 

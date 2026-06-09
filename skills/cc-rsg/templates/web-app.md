@@ -2,231 +2,231 @@
 template_name: web-app
 template_version: 0.1.0
 last_updated: 2026-05-01
-description: Webアプリケーション仕様書テンプレート。HTMLレンダリングを伴う対話的システム向け。
+description: Web application spec template. For interactive systems that render HTML.
 ---
 
-# Webアプリケーション仕様書テンプレート
+# Web application spec template
 
-このテンプレートは、ユーザーが画面を介して操作するWebシステムの仕様書を生成するための章立てを定義する。
+This template defines the chapter outline for the spec of a web system that the user operates through screens.
 
-PHP(Laravel/Symfony/CakePHP)、Python(Django/Flask)、Ruby(Rails)、Node.js(Next.js/Nuxt/Express)、Java(Spring MVC)、ASP.NET MVC等の典型的なWebアプリケーションを想定。
-
----
-
-## 章立て
-
-### 第1章: 概要
-
-<!-- meta: システム全体の俯瞰。読者が「これは何か」を3分で理解できるレベル。 -->
-
-#### 1.1 システム目的
-- このシステムが解決する業務問題
-- 主要ユーザー / ステークホルダー
-- ビジネス上の位置づけ
-
-#### 1.2 主要ユースケース
-- ユースケース1: ...
-- ユースケース2: ...
-- ユースケース3〜5件程度
-
-#### 1.3 全体構成図
-- システム構成のハイレベルな図(コンポーネント図)
-- 必要に応じて Mermaid 記法で記述
+Designed for typical web applications: PHP (Laravel/Symfony/CakePHP), Python (Django/Flask), Ruby (Rails), Node.js (Next.js/Nuxt/Express), Java (Spring MVC), ASP.NET MVC, etc.
 
 ---
 
-### 第2章: アーキテクチャ概要
+## Chapter outline
 
-<!-- meta: 設計判断と全体構造。なぜこの構成かまで記述。 -->
+### Chapter 1: Overview
 
-#### 2.1 採用フレームワーク / ライブラリ
-- 言語・フレームワーク・主要ライブラリ
-- バージョン情報
+<!-- meta: bird's-eye view of the whole system. A 3-minute "what is this" for the reader. -->
 
-#### 2.2 アーキテクチャパターン
-- MVC / クリーンアーキテクチャ / ヘキサゴナル等
-- 採用理由(分かる範囲で)
+#### 1.1 System purpose
+- The business problem this system solves
+- Primary users / stakeholders
+- Position in the business
 
-#### 2.3 ディレクトリ構造
-- 主要ディレクトリの責務
-- 規約(命名規則、配置規則)
+#### 1.2 Main use cases
+- Use case 1: ...
+- Use case 2: ...
+- 3 to 5 use cases
 
-#### 2.4 依存関係
-- 外部システム / API
-- データベース / キャッシュ / メッセージキュー
+#### 1.3 High-level architecture diagram
+- High-level component diagram of the system
+- Use Mermaid notation when appropriate
 
 ---
 
-### 第3章: 画面一覧と遷移
+### Chapter 2: Architecture overview
 
-<!-- meta: 利用者視点のUI構造。 -->
+<!-- meta: design decisions and overall structure. Capture WHY this shape. -->
 
-#### 3.1 画面一覧
-| 画面ID | 画面名 | URL | 認証要否 | 主要権限 |
+#### 2.1 Adopted framework / libraries
+- Language, framework, and major libraries
+- Version information
+
+#### 2.2 Architecture pattern
+- MVC / Clean architecture / Hexagonal, etc.
+- Reason for adoption (to the extent it can be inferred)
+
+#### 2.3 Directory structure
+- Responsibility of each major directory
+- Conventions (naming rules, placement rules)
+
+#### 2.4 Dependencies
+- External systems / APIs
+- Database / cache / message queue
+
+---
+
+### Chapter 3: Screens and screen transitions
+
+<!-- meta: UI structure from the user's perspective. -->
+
+#### 3.1 Screen list
+| Screen ID | Screen name | URL | Auth required | Required role |
 |-------|-------|-----|---------|---------|
-| SC-001 | ログイン | /login | 不要 | - |
-| SC-002 | ダッシュボード | /dashboard | 必要 | 一般ユーザー以上 |
+| SC-001 | Login | /login | no | - |
+| SC-002 | Dashboard | /dashboard | yes | regular user or higher |
 | ... | ... | ... | ... | ... |
 
-#### 3.2 画面遷移図
-- 主要遷移パス(Mermaid 記法等)
-- 例外遷移(エラー時、認証切れ時)
+#### 3.2 Screen-transition diagram
+- Major transition paths (Mermaid notation, etc.)
+- Exceptional transitions (errors, session timeout)
 
-#### 3.3 各画面の詳細
-画面ごとに以下を記述:
-- 表示要素
-- 入力項目とバリデーション
-- アクション(ボタン押下時の挙動)
-- 表示条件(権限、データ状態)
+#### 3.3 Details of each screen
+For each screen, describe:
+- Displayed elements
+- Input fields and their validation
+- Actions (behaviour when buttons are pressed)
+- Display conditions (role, data state)
 
 ---
 
-### 第4章: ルート / エンドポイント一覧
+### Chapter 4: Routes / endpoints
 
-<!-- meta: HTTPルーティングの全件リスト。インベントリベース検証の主軸。 -->
+<!-- meta: full list of HTTP routes. The pillar of inventory-based verification. -->
 
-#### 4.1 Web画面ルート
-| メソッド | パス | コントローラ::アクション | 認証 | 概要 |
+#### 4.1 Web screen routes
+| Method | Path | Controller::Action | Auth | Summary |
 |---------|------|-----------------------|------|------|
-| GET | / | HomeController::index | optional | トップページ |
-| GET | /users/{id} | UserController::show | required | ユーザー詳細 |
+| GET | / | HomeController::index | optional | Top page |
+| GET | /users/{id} | UserController::show | required | User details |
 | ... | ... | ... | ... | ... |
 
-#### 4.2 内部API / Ajax エンドポイント
-- 画面から呼ばれるAjax / Fetch API
-- レスポンス形式
+#### 4.2 Internal API / Ajax endpoints
+- Ajax / Fetch APIs called from the screens
+- Response format
 
-#### 4.3 ルート別ミドルウェア
-- 適用ミドルウェアと処理順序
-
----
-
-### 第5章: データモデル
-
-<!-- meta: 永続化されるデータの構造と意味。 -->
-
-#### 5.1 ER図
-- 主要エンティティ間のリレーション
-- Mermaid記法等で図示
-
-#### 5.2 エンティティ一覧
-エンティティごとに:
-- テーブル名 / クラス名
-- フィールド一覧(型、NULL許容、デフォルト値、業務意味)
-- インデックス
-- 外部キー
-- リレーション(1:1, 1:N, N:N)
-
-#### 5.3 重要なドメインルール
-- 不変条件(invariants)
-- 状態遷移(StateMachine)
-- 業務ルール(例: 退会ユーザーは検索結果から除外)
+#### 4.3 Per-route middleware
+- Applied middleware and the order of processing
 
 ---
 
-### 第6章: 認証認可
+### Chapter 5: Data model
 
-<!-- meta: セキュリティの中核。ここの記述漏れは致命的。 -->
+<!-- meta: structure and semantics of persisted data. -->
 
-#### 6.1 認証方式
-- セッション / トークン / OAuth / SSO
-- パスワードハッシュアルゴリズム
-- セッションタイムアウト
+#### 5.1 ER diagram
+- Relations between key entities
+- Use Mermaid notation, etc.
 
-#### 6.2 権限モデル
-- ロール一覧と権限
-- ロール階層
-- 権限チェックの実装場所
+#### 5.2 Entity list
+Per entity:
+- Table / class name
+- Field list (type, nullability, default, business meaning)
+- Indexes
+- Foreign keys
+- Relations (1:1, 1:N, N:N)
 
-#### 6.3 認可フロー
-- リクエスト → 認可判定 → 実行/拒否のフロー
-- 認可失敗時の挙動
-
-#### 6.4 セッション管理
-- セッションストア
-- セッション無効化条件
-- 同時ログイン制御
+#### 5.3 Key domain rules
+- Invariants
+- State transitions (state machines)
+- Business rules (e.g. "withdrawn users are excluded from search results")
 
 ---
 
-### 第7章: 外部システム連携
+### Chapter 6: Authentication and authorisation
 
-<!-- meta: 境界と障害伝播。 -->
+<!-- meta: security core. Omissions here are critical. -->
 
-#### 7.1 連携先一覧
-| 連携先 | プロトコル | 用途 | 障害時挙動 |
+#### 6.1 Authentication method
+- Session / token / OAuth / SSO
+- Password-hash algorithm
+- Session timeout
+
+#### 6.2 Authorisation model
+- Roles and permissions
+- Role hierarchy
+- Where authorisation checks are implemented
+
+#### 6.3 Authorisation flow
+- Request → authorisation decision → execute / deny flow
+- Behaviour on authorisation failure
+
+#### 6.4 Session management
+- Session store
+- Conditions for session invalidation
+- Concurrent-login control
+
+---
+
+### Chapter 7: External-system integration
+
+<!-- meta: boundaries and failure propagation. -->
+
+#### 7.1 Integration partners
+| Partner | Protocol | Purpose | Behaviour on failure |
 |-------|----------|------|----------|
-| 決済ゲートウェイ | HTTPS REST | 決済処理 | リトライ3回、失敗時通知 |
+| Payment gateway | HTTPS REST | Payment processing | Retry 3 times; notify on failure |
 | ... | ... | ... | ... |
 
-#### 7.2 各連携の詳細
-- 認証方式(APIキー、OAuth等)
-- リクエスト / レスポンス例
-- タイムアウト / リトライ仕様
-- 冪等性の有無
-- 障害時のフォールバック動作
+#### 7.2 Details per integration
+- Authentication method (API key, OAuth, etc.)
+- Request / response example
+- Timeout / retry policy
+- Idempotency (or lack thereof)
+- Fallback behaviour on failure
 
 ---
 
-### 第8章: 運用設定
+### Chapter 8: Operations settings
 
-<!-- meta: デプロイ・環境変数・監視。 -->
+<!-- meta: deployment, environment variables, monitoring. -->
 
-#### 8.1 環境構成
-- 環境一覧(開発、ステージング、本番)
-- 環境間の差異
+#### 8.1 Environment composition
+- Environment list (dev, staging, prod)
+- Differences between environments
 
-#### 8.2 環境変数 / 設定値
-| 変数名 | 必須 | デフォルト | 用途 |
+#### 8.2 Environment variables / configuration values
+| Variable | Required | Default | Purpose |
 |-------|------|----------|------|
-| DB_HOST | 必須 | - | データベース接続先 |
+| DB_HOST | required | - | Database connection target |
 | ... | ... | ... | ... |
 
-#### 8.3 デプロイ手順
-- ビルド手順
-- デプロイコマンド
-- ロールバック手順
+#### 8.3 Deployment procedure
+- Build procedure
+- Deploy command
+- Rollback procedure
 
-#### 8.4 監視 / ログ
-- 監視対象(死活、性能、エラー)
-- ログ出力先・保管期間
-- アラート条件
+#### 8.4 Monitoring / logging
+- Monitoring targets (liveness, performance, errors)
+- Log destination and retention period
+- Alert conditions
 
-#### 8.5 バックアップ / リストア
-- バックアップ対象
-- 取得頻度・世代管理
-- リストア手順
-
----
-
-### 第9章: 既知の制約と未確定事項
-
-<!-- meta: 仕様書の信頼性担保。 -->
-
-#### 9.1 既知の技術的制約
-- 性能上限(同時接続数、レスポンス時間)
-- 既知のバグ / 回避策
-
-#### 9.2 未確定事項
-- Question Bank の `abandoned` エントリをここに記載
-- 各項目に「なぜ確定できなかったか」「現時点の推測」「将来確定するために必要なもの」を記載
+#### 8.5 Backup / restore
+- Backup target
+- Frequency and generation management
+- Restore procedure
 
 ---
 
-## 章立てのカスタマイズ指針
+### Chapter 9: Known constraints and unresolved items
 
-このテンプレートは標準的なWebアプリを想定している。実際のプロジェクトに応じて以下のカスタマイズを推奨する。
+<!-- meta: spec credibility safeguard. -->
 
-### マルチテナント / SaaS の場合
-- 第6章に「テナント分離方式」節を追加
+#### 9.1 Known technical constraints
+- Performance ceilings (concurrent connections, response time)
+- Known bugs / workarounds
 
-### バックグラウンドジョブが多い場合
-- 第7章と第8章の間に「バックグラウンドジョブ」章を追加(`templates/batch-system.md`の章立てを参考)
+#### 9.2 Unresolved items
+- Place the `abandoned` entries from the Question Bank here
+- For each item, record "why it could not be resolved", "current inference", "what is needed to resolve it in the future"
 
-### 多言語対応がある場合
-- 第3章に「国際化(i18n)」節を追加
+---
 
-### モバイルアプリも提供している場合
-- 第4章を「Webルート」と「モバイルAPI」に分割
+## Customisation guidance
 
-カスタマイズはPhase 1のテンプレート選定後、利用者との対話で確定する。
+This template assumes a standard web application. Customise as the actual project requires.
+
+### Multi-tenant / SaaS
+- Add a "tenant isolation" section to Chapter 6.
+
+### Many background jobs
+- Insert a "background jobs" chapter between Chapter 7 and Chapter 8 (see `templates/batch-system.md` for the outline).
+
+### Multi-language support
+- Add an "internationalisation (i18n)" section to Chapter 3.
+
+### A mobile app is also offered
+- Split Chapter 4 into "Web routes" and "Mobile API".
+
+Customisation is finalised in dialogue with the user after Phase 1 template selection.

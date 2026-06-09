@@ -1,168 +1,168 @@
 # Verification Checklists Reference
 
-Phase 4(Verify)で実施する検証のチェックリスト集。インベントリベース検証の補助として、テンプレート別の必須項目チェックと、横断的な品質チェックを定義する。
+A catalogue of checklists run in Phase 4 (Verify). Alongside inventory-based verification, this defines per-template mandatory-item checks and cross-cutting quality checks.
 
 ---
 
-## 検証の3階層
+## Verification has 3 tiers
 
-Phase 4の検証は以下3階層で実施する。
+Phase 4 verification runs in 3 tiers:
 
-1. **インベントリベース検証**: コード由来の単位が仕様書で言及されているか(`scripts/coverage-check.py`)
-2. **テンプレート必須項目検証**: 選定したテンプレートの必須章/節が満たされているか(本ドキュメント)
-3. **横断品質検証**: 不確実性マーカーの量、トレーサビリティ参照の有無、章間整合性(本ドキュメント)
-
----
-
-## テンプレート別 必須項目チェック
-
-### Webアプリケーション仕様書
-
-- [ ] 概要章に「主要ユースケース3〜5件」が記載されている
-- [ ] 全エンドポイント / ルートが「ルート一覧」章にリストされている
-- [ ] 各画面に「アクセス条件(認証要否、権限)」が記載されている
-- [ ] データモデル章にER図またはエンティティ一覧がある
-- [ ] 認証認可章に「認証方式」「権限モデル」「セッション管理」が記載されている
-- [ ] 外部連携章に各連携先の「連携方式」「障害時挙動」が記載されている
-- [ ] 運用設定章に「環境変数」「デプロイ手順」が記載されている
-
-### バッチ処理システム仕様書
-
-- [ ] 全ジョブが「ジョブ一覧」章にリストされている
-- [ ] 各ジョブに「起動条件」「想定実行時間」「実行ユーザー」が記載されている
-- [ ] データフロー章に「入力データソース」「出力先」が記載されている
-- [ ] エラー処理章に「リトライ方針」「失敗時の挙動」が記載されている
-- [ ] リカバリ手順章に「再実行可否」「冪等性の有無」が記載されている
-- [ ] 運用カレンダー章にジョブ間依存関係グラフがある
-- [ ] 監視章に「監視項目」「アラート条件」が記載されている
-
-### APIサービス仕様書
-
-- [ ] 全エンドポイントが章別に記載されている
-- [ ] 各エンドポイントに「メソッド」「URLパターン」「認証要否」「リクエスト例」「レスポンス例」がある
-- [ ] エラーコード章に全エラーコードがリストされている
-- [ ] 認証章に「認証方式」「トークン有効期限」「更新手順」が記載されている
-- [ ] レート制限章に「制限値」「制限単位」「超過時の挙動」が記載されている
-- [ ] バージョニング章に「現行バージョン」「サポート期間」「破壊的変更ポリシー」が記載されている
-- [ ] SLA章に「可用性目標」「応答時間目標」が記載されている
-
-### ライブラリ/SDK仕様書
-
-- [ ] インストール方法章にパッケージマネージャ別のコマンド例がある
-- [ ] 公開API一覧章に全公開クラス/関数がリストされている
-- [ ] 利用例章に「最小限のクイックスタート」がある
-- [ ] 設定オプション章に全オプションが「型・デフォルト・意味」で記載されている
-- [ ] 互換性章に「対応言語バージョン」「依存ライブラリ」が記載されている
-- [ ] マイグレーションガイド章が用意されている(初版でも空欄章として用意)
+1. **Inventory-based check**: whether code-derived units are mentioned in the spec (`scripts/coverage-check.py`).
+2. **Template mandatory-item check**: whether the selected template's required chapters/sections are satisfied (this document).
+3. **Cross-cutting quality check**: amount of uncertainty markers, presence of traceability citations, cross-chapter consistency (this document).
 
 ---
 
-## 横断品質チェック
+## Per-template mandatory-item checks
 
-テンプレートを問わず、全仕様書に対して以下を確認する。
+### Web application spec
 
-### ファイル命名規約・必須ファイル
-- [ ] `drafts/` 配下の全章ファイルが `^(0\d|[1-9]\d)-[a-z0-9-]+\.md$` パターンに合致(`coverage-check.py` で自動検査、違反は WARN)
-- [ ] 必須3ファイル(`00-metadata.md`, `99-unresolved.md`, `traceability.md`)が `drafts/` または `final/` に存在(`coverage-check.py` で自動検査、欠落は ERROR)
-- [ ] 章番号(`NN` 部分)に重複・不要な飛びがない
+- [ ] The overview chapter lists "3 to 5 main use cases".
+- [ ] Every endpoint / route is listed in the "Routes" chapter.
+- [ ] Each screen documents its "access conditions (auth required, role)".
+- [ ] The data-model chapter has an ER diagram or an entity list.
+- [ ] The authentication chapter covers "auth method", "role model", and "session management".
+- [ ] The integration chapter documents each partner's "integration method" and "behaviour on failure".
+- [ ] The operations chapter documents "environment variables" and "deployment procedure".
 
-### トレーサビリティ
-- [ ] 各章で1件以上の `[REF: file:lines]` 参照がある
-- [ ] トレーサビリティ表が `final/traceability.md` として生成されている
-- [ ] 参照先のファイルパスが実在する(リンク切れがない)
-- [ ] 参照先の行番号範囲が妥当(ファイルの行数を超えていない)
+### Batch-system spec
 
-### 不確実性マーカー
-- [ ] `[BLOCKED]` マーカーがある場合、対応するQuestion IDが`questions.json`に存在する
-- [ ] `[CONFIDENCE: LOW]` マーカーが章の半分以上に出現していない(出現していたらサブエージェント再実行を検討)
-- [ ] `[ASK SME]` マーカーが残っている場合、Phase 5対話で扱われる予定として記録されている
+- [ ] Every job is listed in the "Job catalogue" chapter.
+- [ ] Each job documents "trigger conditions", "expected runtime", and "execution user".
+- [ ] The data-flow chapter documents "input data source" and "output destination".
+- [ ] The error-handling chapter documents "retry policy" and "behaviour on failure".
+- [ ] The recovery chapter documents "re-runnability" and "idempotency".
+- [ ] The operations-calendar chapter contains a job-dependency graph.
+- [ ] The monitoring chapter documents "monitored items" and "alert conditions".
 
-### 章間整合性
-- [ ] 同一インベントリ項目が複数章で言及される場合、記述が矛盾していない
-- [ ] 設定値・しきい値が章間で一致している(例: リトライ回数)
-- [ ] 用語が章間で一貫している(例: 「ユーザー」と「会員」の混在がない)
+### API service spec
 
-### Question Bank整合性
-- [ ] `questions.json` の全エントリに必須フィールドが揃っている
-- [ ] `status: open` のエントリに `severity` が設定されている
-- [ ] `status: answered` のエントリに `answer` と `answered_at` が設定されている
-- [ ] `related_inventory_ids` で参照されるInventory IDが`inventory.json`に存在する
+- [ ] Every endpoint is described in its own section.
+- [ ] Each endpoint has "method", "URL pattern", "auth required", "request example", "response example".
+- [ ] The error-codes chapter enumerates every error code.
+- [ ] The authentication chapter documents "method", "token lifetime", "refresh procedure".
+- [ ] The rate-limit chapter documents "limit value", "limit unit", "behaviour when exceeded".
+- [ ] The versioning chapter documents "current version", "support window", "breaking-change policy".
+- [ ] The SLA chapter documents "availability target" and "response-time target".
 
-### 「未確定事項」章
-- [ ] `status: abandoned` のエントリすべてが「未確定事項」章に記載されている
-- [ ] 各未確定事項に「なぜ確定できなかったか」「現時点の推測」「将来確定するために必要なもの」が記載されている
+### Library / SDK spec
 
----
-
-## 検証スクリプトとの対応
-
-`scripts/coverage-check.py` で自動化される項目:
-- インベントリベース検証(全件)
-- 章ファイル命名規約チェック(WARN、`--strict` で ERROR 化)
-- 必須3ファイル存在チェック(`00-metadata.md` / `99-unresolved.md` / `traceability.md`、欠落は常に ERROR)
-- トレーサビリティの「参照先ファイルパス実在性」
-- Question Bank整合性の必須フィールドチェック
-
-人間レビュー or Claudeのレビューに委ねる項目:
-- テンプレート別必須項目(意味的なチェック)
-- 章間整合性(セマンティック)
-- 用語一貫性
+- [ ] The installation chapter contains per-package-manager command examples.
+- [ ] The public-API catalogue lists every public class / function.
+- [ ] The usage-examples chapter contains a "minimal quick start".
+- [ ] The configuration-options chapter documents every option with type, default, and meaning.
+- [ ] The compatibility chapter documents "supported language versions" and "dependencies".
+- [ ] The migration-guide chapter is prepared (kept as an empty section in v1 is fine).
 
 ---
 
-## 検証レポートの生成例
+## Cross-cutting quality checks
 
-Phase 4完了時、利用者に以下のフォーマットで報告する。
+Regardless of template, confirm the following on every spec.
+
+### Filename convention and required files
+- [ ] Every chapter file under `drafts/` matches `^(0\d|[1-9]\d)-[a-z0-9-]+\.md$` (`coverage-check.py` checks this; violations are WARN).
+- [ ] The three required files (`00-metadata.md`, `99-unresolved.md`, `traceability.md`) exist under `drafts/` or `final/` (`coverage-check.py` checks this; missing files are ERROR).
+- [ ] Chapter numbers (`NN`) have no duplicates and no unnecessary gaps.
+
+### Traceability
+- [ ] Every chapter has at least one `[REF: file:lines]` citation.
+- [ ] The traceability table is generated as `final/traceability.md`.
+- [ ] Cited file paths exist (no broken links).
+- [ ] Cited line ranges are valid (do not exceed the file's line count).
+
+### Uncertainty markers
+- [ ] When `[BLOCKED]` markers appear, the corresponding Question ID exists in `questions.json`.
+- [ ] `[CONFIDENCE: LOW]` markers do not appear in more than half of any chapter (if they do, consider re-running the sub-agent).
+- [ ] Remaining `[ASK SME]` markers are recorded as items to be handled in Phase 5 dialogue.
+
+### Cross-chapter consistency
+- [ ] When the same inventory item is mentioned in multiple chapters, the descriptions do not contradict each other.
+- [ ] Configuration values / thresholds are consistent across chapters (e.g. retry count).
+- [ ] Terminology is consistent across chapters (e.g. no mixing of "user" and "member").
+
+### Question Bank consistency
+- [ ] Every `questions.json` entry has all required fields.
+- [ ] `status: open` entries have a `severity`.
+- [ ] `status: answered` entries have `answer` and `answered_at` set.
+- [ ] Inventory IDs referenced in `related_inventory_ids` exist in `inventory.json`.
+
+### "Unresolved items" chapter
+- [ ] Every `status: abandoned` entry is captured in the "Unresolved items" chapter.
+- [ ] Each unresolved item documents "why it could not be resolved", "current inference", "what is needed to resolve in the future".
+
+---
+
+## Mapping to the verification script
+
+Items automated by `scripts/coverage-check.py`:
+- Inventory-based check (all items)
+- Chapter naming-convention check (WARN; promoted to ERROR with `--strict`)
+- Presence of the three required files (`00-metadata.md` / `99-unresolved.md` / `traceability.md`; always ERROR if missing)
+- Existence of cited file paths in traceability
+- Required-field check on the Question Bank
+
+Items left to human or Claude review:
+- Per-template mandatory items (semantic checks)
+- Cross-chapter consistency (semantic)
+- Terminology consistency
+
+---
+
+## Example verification report
+
+At the end of Phase 4, report to the user in the following format.
 
 ```
-=== Phase 4 検証レポート ===
+=== Phase 4 Verification Report ===
 
-【インベントリカバレッジ】
-- 全インベントリ項目: 247件
-- 言及あり: 232件 (93.9%)
-- 未言及: 15件
+[Inventory coverage]
+- All inventory items: 247
+- Mentioned: 232 (93.9%)
+- Unmentioned: 15
   - INV-042 ScheduledMaintenanceJob (src/jobs/ScheduledMaintenanceJob.php:8)
   - INV-067 LegacyApiAdapter (src/adapters/LegacyApiAdapter.php:15)
   - ...
 
-【テンプレート必須項目】
-- Webアプリケーション仕様書 必須項目: 7件
-- 充足: 5件
-- 未充足: 2件
-  - 「外部連携章に各連携先の障害時挙動が記載されている」
-  - 「運用設定章にデプロイ手順が記載されている」
+[Template mandatory items]
+- Web application spec mandatory items: 7
+- Satisfied: 5
+- Unsatisfied: 2
+  - "Integration chapter documents each partner's behaviour on failure"
+  - "Operations chapter documents the deployment procedure"
 
-【横断品質】
-- トレーサビリティ参照: 全43章 → 平均8.2件/章 ✓
-- [BLOCKED]マーカー: 3件(対応Question ID: Q-014, Q-027, Q-038)
-- [CONFIDENCE: LOW]マーカー: 12件
-- 章間整合性: 矛盾2件検出
-  - 「リトライ回数」が3章では3回、5章では5回として記述されている → Q-098 として登録
+[Cross-cutting quality]
+- Traceability citations: 43 chapters; average 8.2 / chapter ✓
+- [BLOCKED] markers: 3 (corresponding Question IDs: Q-014, Q-027, Q-038)
+- [CONFIDENCE: LOW] markers: 12
+- Cross-chapter consistency: 2 contradictions detected
+  - "Retry count" is described as 3 in Chapter 3 and 5 in Chapter 5 → filed as Q-098
   - ...
 
-【Question Bank】
-- 全疑問: 84件
-- open: 42件
-- 重複候補(自動マージ): 6件
-- グループ化候補(ユーザー判断): 8件
+[Question Bank]
+- All questions: 84
+- open: 42
+- Duplicate candidates (auto-merge): 6
+- Grouping candidates (user decision): 8
 
-【次の推奨アクション】
-- 未言及インベントリ項目15件に対して追加調査タスクを生成
-- 章間整合性の矛盾2件をQuestion Bankに登録
-- Phase 5(対話による精緻化)へ進む
+[Recommended next actions]
+- Generate additional-investigation tasks for the 15 unmentioned inventory items
+- File the 2 cross-chapter inconsistencies into the Question Bank
+- Proceed to Phase 5 (Refine via Dialogue)
 ```
 
 ---
 
-## チェックリストのカスタマイズ
+## Customising the checklist
 
-利用者が独自のチェック項目を追加したい場合、`.cc-rsg/custom-checklists.md` を作成して項目を追記する。Claudeは Phase 4で標準チェックに加えてカスタムチェックも実行する。
+When the user wants to add their own checks, create `.cc-rsg/custom-checklists.md` and append items there. In Phase 4, Claude runs the custom checks in addition to the standard ones.
 
-カスタムチェック項目は以下フォーマットで記述する。
+Format custom checks like this:
 
 ```markdown
-- [ ] [check_id] チェック項目の説明
-  - 適用条件: テンプレート種別 / 全テンプレート
-  - 検証方法: 手動 / 自動(スクリプトパス)
-  - 失敗時の対応: 警告のみ / Phase 5への持ち越し
+- [ ] [check_id] description of the check
+  - Applicability: template type / all templates
+  - Method: manual / automatic (script path)
+  - On failure: warning only / defer to Phase 5
 ```

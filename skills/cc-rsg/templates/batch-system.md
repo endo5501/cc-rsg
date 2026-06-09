@@ -2,258 +2,258 @@
 template_name: batch-system
 template_version: 0.1.0
 last_updated: 2026-05-01
-description: バッチ処理システム仕様書テンプレート。定期実行・データパイプライン・COBOLジョブ等を想定。
+description: Batch-system spec template. For scheduled jobs, data pipelines, COBOL batch jobs, and similar.
 ---
 
-# バッチ処理システム仕様書テンプレート
+# Batch-system spec template
 
-このテンプレートは、定期実行またはイベント駆動のバックグラウンド処理システムの仕様書を生成するための章立てを定義する。
+This template defines the chapter outline for the spec of a scheduled or event-driven background-processing system.
 
-COBOL + JCL、cron / systemd timer、Spring Batch、Apache Airflow、Celery、Sidekiq、AWS Batch、AWS Lambda定時実行、データパイプライン(ETL)等を想定。
-
----
-
-## 章立て
-
-### 第1章: 概要
-
-<!-- meta: バッチシステム全体の業務目的。 -->
-
-#### 1.1 業務目的
-- このバッチシステムが解決する業務問題
-- 業務サイクル(月次、週次、日次、リアルタイム)上の位置づけ
-
-#### 1.2 主要ジョブ群
-- 主要ジョブカテゴリ(集計、転送、整合性チェック等)
-- 各カテゴリの代表ジョブ
-
-#### 1.3 関連システム
-- 入力データの提供元
-- 出力データの利用先
+Designed for COBOL + JCL, cron / systemd timers, Spring Batch, Apache Airflow, Celery, Sidekiq, AWS Batch, AWS Lambda scheduled runs, ETL data pipelines, etc.
 
 ---
 
-### 第2章: アーキテクチャ概要
+## Chapter outline
 
-<!-- meta: バッチ実行基盤の構成。 -->
+### Chapter 1: Overview
 
-#### 2.1 採用技術スタック
-- 言語・フレームワーク
-- スケジューラ(cron / Airflow / Spring Batch / JCL等)
-- ジョブ実行環境(オンプレミス / クラウド / コンテナ)
+<!-- meta: business purpose of the batch system as a whole. -->
 
-#### 2.2 ジョブ実行モデル
-- 単発実行 / チェイン実行 / DAG実行
-- 並列度
-- リソース割り当て
+#### 1.1 Business purpose
+- The business problem this batch system solves
+- Position in the business cycle (monthly, weekly, daily, real-time)
 
-#### 2.3 入出力データストア
-- データベース / ファイルストレージ / メッセージキュー
-- データ形式(CSV, JSON, XML, 固定長, Parquet等)
+#### 1.2 Major job groups
+- Major job categories (aggregation, transfer, integrity check, etc.)
+- Representative jobs per category
+
+#### 1.3 Related systems
+- Sources of input data
+- Consumers of output data
 
 ---
 
-### 第3章: ジョブ一覧
+### Chapter 2: Architecture overview
 
-<!-- meta: 全ジョブのインベントリ。検証の主軸。 -->
+<!-- meta: structure of the batch execution platform. -->
 
-#### 3.1 ジョブカタログ
-| ジョブID | ジョブ名 | 種別 | 起動頻度 | 想定実行時間 | 主担当データ |
+#### 2.1 Technology stack
+- Language / framework
+- Scheduler (cron / Airflow / Spring Batch / JCL, etc.)
+- Job runtime (on-prem / cloud / container)
+
+#### 2.2 Job execution model
+- One-shot / chained / DAG-driven
+- Parallelism
+- Resource allocation
+
+#### 2.3 Input/output data stores
+- Database / file storage / message queue
+- Data formats (CSV, JSON, XML, fixed-length, Parquet, etc.)
+
+---
+
+### Chapter 3: Job catalogue
+
+<!-- meta: inventory of all jobs. The pillar of verification. -->
+
+#### 3.1 Job catalogue
+| Job ID | Job name | Kind | Frequency | Expected runtime | Primary data |
 |---------|---------|------|---------|------------|------------|
-| JOB-001 | 日次売上集計 | 集計 | 日次 02:00 | 30分 | sales |
-| JOB-002 | ユーザー無効化 | 整合性 | 月次 月初 | 2時間 | users |
+| JOB-001 | Daily sales aggregation | aggregation | daily 02:00 | 30 min | sales |
+| JOB-002 | User deactivation | integrity | monthly (1st) | 2 hours | users |
 | ... | ... | ... | ... | ... | ... |
 
-#### 3.2 各ジョブの詳細
-ジョブごとに以下を記述:
-- 業務目的
-- 入力データソース
-- 処理内容
-- 出力先
-- 実行ユーザー / 権限
-- 実行ホスト / コンテナイメージ
-- リソース要件(CPU / メモリ / ディスク)
+#### 3.2 Per-job details
+For each job, describe:
+- Business purpose
+- Input data source
+- Processing
+- Output destination
+- Execution user / privileges
+- Execution host / container image
+- Resource requirements (CPU / memory / disk)
 
 ---
 
-### 第4章: 起動条件 / スケジュール
+### Chapter 4: Triggers and schedule
 
-<!-- meta: いつ何をトリガに動くか。 -->
+<!-- meta: when and on what trigger each job runs. -->
 
-#### 4.1 スケジュール定義
-| ジョブID | スケジュール表現 | タイムゾーン | 実営業日のみ |
+#### 4.1 Schedule definitions
+| Job ID | Schedule expression | Timezone | Business days only |
 |---------|----------------|-----------|------------|
-| JOB-001 | `0 2 * * *` (cron) | Asia/Tokyo | はい |
+| JOB-001 | `0 2 * * *` (cron) | Asia/Tokyo | yes |
 | ... | ... | ... | ... |
 
-#### 4.2 イベントトリガ
-- ファイル到着トリガ
-- メッセージ到着トリガ
-- 上流ジョブ完了トリガ
+#### 4.2 Event triggers
+- File-arrival triggers
+- Message-arrival triggers
+- Upstream-job completion triggers
 
-#### 4.3 業務カレンダー考慮
-- 営業日 / 非営業日の扱い
-- 月末・月初の特別処理
-- 祝日カレンダーの参照先
-
----
-
-### 第5章: データフロー
-
-<!-- meta: 入力 → 加工 → 出力。データの流れを追跡可能に。 -->
-
-#### 5.1 データフロー図
-- 主要ジョブ群のデータフロー(Mermaid記法等)
-- データソースから最終出力までの経路
-
-#### 5.2 各ジョブのデータ I/O
-ジョブごとに:
-- 入力データ
-  - ソース(テーブル / ファイル / API)
-  - 件数想定 / サイズ想定
-  - 抽出条件
-- 加工処理
-  - 主要ロジック
-  - 集計単位
-  - 例外データの扱い
-- 出力データ
-  - 出力先
-  - 形式
-  - 後続ジョブへの引き渡し方法
-
-#### 5.3 中間データの管理
-- ワークテーブル / 一時ファイル
-- 保持期間 / クリーンアップ方針
+#### 4.3 Business-calendar handling
+- Business-day / non-business-day handling
+- Special handling at month start / end
+- Holiday-calendar source
 
 ---
 
-### 第6章: エラー処理 / リトライ方針
+### Chapter 5: Data flow
 
-<!-- meta: 失敗時の挙動。冪等性も含む。 -->
+<!-- meta: input → transform → output. Make data movement traceable. -->
 
-#### 6.1 エラー分類
-| エラー種別 | 例 | リトライ可否 | 対応 |
+#### 5.1 Data-flow diagram
+- Data flow across major jobs (Mermaid notation, etc.)
+- Path from data sources to final outputs
+
+#### 5.2 Per-job data I/O
+For each job:
+- Input data
+  - Source (table / file / API)
+  - Expected count / size
+  - Extraction conditions
+- Processing
+  - Main logic
+  - Aggregation unit
+  - Exceptional-data handling
+- Output data
+  - Destination
+  - Format
+  - Hand-off to downstream jobs
+
+#### 5.3 Intermediate-data management
+- Work tables / temporary files
+- Retention period / cleanup policy
+
+---
+
+### Chapter 6: Error handling and retry policy
+
+<!-- meta: behaviour on failure, including idempotency. -->
+
+#### 6.1 Error classification
+| Error kind | Example | Retryable? | Response |
 |----------|----|-----------|------|
-| 入力データ異常 | フォーマット不正 | リトライ不可 | 異常データを別途出力、後続続行 |
-| 一時的システム障害 | DB接続失敗 | 3回リトライ | 失敗時アラート |
-| データ整合性異常 | 重複キー | リトライ不可 | ジョブ全体失敗 |
+| Input-data anomaly | malformed format | not retryable | log anomaly separately, continue downstream |
+| Transient system failure | DB connection failure | retry up to 3 times | alert on final failure |
+| Data-integrity anomaly | duplicate key | not retryable | fail the entire job |
 | ... | ... | ... | ... |
 
-#### 6.2 リトライ仕様
-- リトライ間隔(固定 / 指数バックオフ)
-- 最大リトライ回数
-- リトライ対象エラー判定ロジック
+#### 6.2 Retry specification
+- Retry interval (fixed / exponential backoff)
+- Maximum retry count
+- Logic that decides whether an error is retryable
 
-#### 6.3 冪等性
-- ジョブ別の冪等性保証
-- 同じ入力で複数回実行可能か
-- チェックポイント機構の有無
+#### 6.3 Idempotency
+- Idempotency guarantees per job
+- Whether the same input may be processed multiple times
+- Presence of a checkpoint mechanism
 
-#### 6.4 エラー通知
-- 通知チャンネル(メール / Slack / PagerDuty)
-- 通知レベル(WARN / ERROR / CRITICAL)
-- 通知内容のテンプレート
+#### 6.4 Error notifications
+- Notification channels (email / Slack / PagerDuty)
+- Notification levels (WARN / ERROR / CRITICAL)
+- Notification body templates
 
 ---
 
-### 第7章: リカバリ手順
+### Chapter 7: Recovery procedures
 
-<!-- meta: 障害時の復旧手順書。運用担当者が見て手を動かせるレベル。 -->
+<!-- meta: incident runbook. Detailed enough that an operator can act on it. -->
 
-#### 7.1 障害シナリオ別リカバリ
-| シナリオ | 影響範囲 | 復旧手順 | 想定復旧時間 |
+#### 7.1 Recovery per failure scenario
+| Scenario | Blast radius | Recovery steps | Expected recovery time |
 |---------|---------|---------|------------|
-| ジョブ実行失敗 | 当該ジョブのみ | 入力データ確認 → 手動再実行 | 30分 |
-| データ破損 | 後続ジョブへ伝播 | バックアップから復元 → 再実行 | 4時間 |
+| Job-execution failure | single job | check input → manual re-run | 30 min |
+| Data corruption | propagates downstream | restore from backup → re-run | 4 hours |
 | ... | ... | ... | ... |
 
-#### 7.2 部分再実行
-- 中断地点からの再開可否
-- チェックポイント機構の使い方
+#### 7.2 Partial re-run
+- Whether the job can resume from the interruption point
+- How to use the checkpoint mechanism
 
-#### 7.3 取消し操作
-- 実行済みジョブの結果取消し手順
-- データ補正コマンド
+#### 7.3 Undo operations
+- How to cancel the result of an already-executed job
+- Data-correction commands
 
 #### 7.4 RTO / RPO
-- 想定 Recovery Time Objective
-- 想定 Recovery Point Objective
+- Expected Recovery Time Objective
+- Expected Recovery Point Objective
 
 ---
 
-### 第8章: 運用カレンダー / 依存関係
+### Chapter 8: Operations calendar and dependencies
 
-<!-- meta: ジョブ間の時系列依存。 -->
+<!-- meta: temporal dependencies between jobs. -->
 
-#### 8.1 ジョブ依存グラフ
-- DAG図(Mermaid記法等)
-- 依存条件(成功時 / 失敗時 / 完了時)
+#### 8.1 Job-dependency graph
+- DAG diagram (Mermaid notation, etc.)
+- Dependency conditions (on success / on failure / on completion)
 
-#### 8.2 実行タイムライン
-- 1日のジョブ実行スケジュールを時系列で図示
-- ピーク時間帯の特定
+#### 8.2 Execution timeline
+- One day's job schedule visualised on a timeline
+- Identification of peak time windows
 
-#### 8.3 月次 / 年次サイクル
-- 月次バッチの実行日
-- 年度切替処理
-- 期末処理
+#### 8.3 Monthly / yearly cycles
+- Day-of-month for monthly batches
+- Fiscal-year rollover processing
+- End-of-period processing
 
 ---
 
-### 第9章: 監視 / アラート
+### Chapter 9: Monitoring / alerts
 
-<!-- meta: 運用担当者が何を見るか。 -->
+<!-- meta: what the operators look at. -->
 
-#### 9.1 監視項目
-| 監視対象 | 監視方法 | しきい値 | 対応 |
+#### 9.1 Monitoring items
+| Target | Method | Threshold | Action |
 |---------|---------|---------|------|
-| ジョブ実行成否 | ログパース | 失敗時即時 | アラート発報 |
-| ジョブ実行時間 | メトリクス | 想定時間 +20% | 警告通知 |
-| データ件数 | 集計クエリ | 過去平均 ±30% | 警告通知 |
+| Job success/failure | log parsing | immediate on failure | alert |
+| Job duration | metrics | expected duration + 20% | warning |
+| Record count | aggregation query | past mean ± 30% | warning |
 | ... | ... | ... | ... |
 
-#### 9.2 ログ仕様
-- ログ出力フォーマット
-- ログ保管先
-- 保管期間
-- 検索可能性(構造化ログ / インデックス)
+#### 9.2 Log specification
+- Log output format
+- Log destination
+- Retention period
+- Searchability (structured logs / indexes)
 
-#### 9.3 ダッシュボード
-- 主要ダッシュボードへのリンク
-- 表示項目
-
----
-
-### 第10章: 既知の制約と未確定事項
-
-<!-- meta: 仕様書の信頼性担保。 -->
-
-#### 10.1 既知の技術的制約
-- 同時実行数上限
-- データ件数の処理上限
-- 既知のパフォーマンス問題
-
-#### 10.2 未確定事項
-- Question Bank の `abandoned` エントリをここに記載
+#### 9.3 Dashboards
+- Links to primary dashboards
+- Displayed items
 
 ---
 
-## 章立てのカスタマイズ指針
+### Chapter 10: Known constraints and unresolved items
 
-### COBOL + JCL の場合
-- 第3章に「JCL ステップ詳細」節を追加
-- 第5章に「COPYBOOK 仕様」節を追加
+<!-- meta: spec credibility safeguard. -->
 
-### Apache Airflow の場合
-- 第8章を「DAG 定義」中心に書き換え
-- 各DAGの SLA を第9章に明記
+#### 10.1 Known technical constraints
+- Maximum concurrency
+- Maximum data volume that can be processed
+- Known performance issues
 
-### データパイプライン(ETL)の場合
-- 第5章を「Extract / Transform / Load」の3節に再構成
-- スキーマ変更管理を別章として追加
+#### 10.2 Unresolved items
+- Place the `abandoned` entries from the Question Bank here
 
-### イベント駆動が主の場合
-- 第4章を「イベント定義」中心に書き換え
-- 第8章の依存グラフをイベントフロー図に置き換え
+---
 
-カスタマイズはPhase 1のテンプレート選定後、利用者との対話で確定する。
+## Customisation guidance
+
+### COBOL + JCL
+- Add a "JCL step details" section to Chapter 3.
+- Add a "COPYBOOK specification" section to Chapter 5.
+
+### Apache Airflow
+- Rewrite Chapter 8 around "DAG definitions".
+- Explicitly state the SLA of each DAG in Chapter 9.
+
+### Data pipeline (ETL)
+- Restructure Chapter 5 into three sections: Extract / Transform / Load.
+- Add a separate chapter for schema-change management.
+
+### Primarily event-driven
+- Rewrite Chapter 4 around "event definitions".
+- Replace the dependency graph in Chapter 8 with an event-flow diagram.
+
+Customisation is finalised in dialogue with the user after Phase 1 template selection.
