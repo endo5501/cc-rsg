@@ -20,7 +20,7 @@ These 5 tables exist as **abstractions in every language and framework** and for
 
 | Marker | Meaning | Grounding evidence |
 |---|---|---|
-| 🟢 **VERIFIED** | Confirmed the real code via `file_editor view` | The file appears in the view history |
+| 🟢 **VERIFIED** | Confirmed the real code by reading it with the Read tool | The file appears in the read history |
 | 🟡 **INFERRED** | **Mechanically extracted** via ripgrep / imports / naming convention | The `rg` hit line can be cited as `[REF: path:Lstart-Lend]` |
 | 🔴 **ASSUMED** | Inferred from framework "typical behaviour" (code unread) | Needs SME confirmation; pair with `[ASK SME]` marker |
 

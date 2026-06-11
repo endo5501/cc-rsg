@@ -243,7 +243,7 @@ cc-rsg/
 
 ## Status
 
-Currently **v0.4.0** (fully English-base; bilingual output).
+Currently **v0.4.1** (English-base; runtime-agnostic phrasing).
 
 ### Known Limitations
 
@@ -560,7 +560,7 @@ cc-rsg/
 
 ## 開発状況
 
-現在 **v0.4.0**(英語ベース完全移行、出力言語切替対応)。
+現在 **v0.4.1**(英語ベース完全移行、ランタイム非依存表現に整理)。
 
 ### 既知の制約
 

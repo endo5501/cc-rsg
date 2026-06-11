@@ -90,9 +90,9 @@ Right after the skill starts, fix the scope and the goal. Every later decision d
      - `allow_multiple = false`, `allow_free_text = false`
    - Map the selected label to `output_language`: `English` → `"en"`, `日本語 (Japanese)` → `"ja"`. Persistence to `goal.json` happens together with the other answers in Step 5.
    - **Default policy (English-base, effective v0.4.0)**: when the user submits without changing the highlighted choice, treat the answer as `"en"`.
-   - **Harness hint precedence**: when a parent harness injects a `userUiLanguage` hint into the initial prompt, use that hint to decide which choice is **pre-highlighted** (`en` highlights `English`; `ja` highlights `日本語 (Japanese)`). The hint never overrides the user's explicit selection. Priority order:
+   - **Harness hint precedence (optional)**: if a parent runtime supplies a UI-language hint in the initial prompt, use it to decide which choice is **pre-highlighted** (`en` highlights `English`; `ja` highlights `日本語 (Japanese)`). The hint never overrides the user's explicit selection. Priority order:
      1. The user's explicit click in this step (highest)
-     2. `userUiLanguage` hint from the parent harness (if any)
+     2. Runtime-supplied UI-language hint (if any)
      3. Hard default `"en"` (lowest)
    - **All natural-language output from Step 4 onward** — `AskUserQuestion` bodies and choices, confirmation summaries, chapter titles, generated spec body, `questions.json` body text, etc. — is rendered in the language selected here (see Design Principle #11).
    - **Resume mode**: when `.cc-rsg/goal.json` already exists, read the persisted `output_language` and skip this step entirely.
@@ -393,9 +393,9 @@ To make "writing a chapter without opening the code" structurally impossible, pe
 
 #### STEP A: Sources Read (mandatory; skipping causes Phase 4 failure)
 
-For every INV in that chapter's `wbs.json.chapters[*].assigned_inventory_ids`, **`file_editor view` the corresponding real source files**.
+For every INV in that chapter's `wbs.json.chapters[*].assigned_inventory_ids`, **read the corresponding real source files with the Read tool** (or the equivalent file-reading tool of the host runtime).
 
-List the viewed file paths and line ranges at the **top of the chapter under a `## Sources Read` section**:
+List the read file paths and line ranges at the **top of the chapter under a `## Sources Read` section**:
 
 ```markdown
 # Chapter 5: Data Model
@@ -479,7 +479,7 @@ Target inventory_ids:
 - INV-014 (User)
 - INV-015 (Role)
 
-Corresponding real sources (file_editor view these):
+Corresponding real sources (read these with the Read tool):
 - app/models/project.rb
 - app/models/issue.rb
 - app/models/user.rb
@@ -509,12 +509,12 @@ in English.
 
 **Important constraints**:
 
-- **Sequential execution (parallelism 1)**: OpenHands SDK's TaskManager runs them one at a time via an internal `threading.Lock`. 13 chapters → 13 sequential `task` calls. **Total time is NOT reduced**, but isolated per-chapter contexts improve quality.
-- **Prompt cache is NOT shared**: each sub-agent has an isolated LLM context, so token usage is 5–10× the main agent. ChatGPT Plus subscription users hit caps quickly — **Anthropic API / OpenAI API modes are recommended**.
-- **The sub-agent writes the chapter draft directly via `file_editor`** (saved as a file, NOT returned in the task result text). The main agent reads the return value and appends detail questions into `questions.json`.
+- **Concurrency depends on the host runtime**: some runtimes run sub-agent tasks sequentially (one at a time), others in parallel. Total wall time may not be reduced, but per-chapter isolation improves quality regardless.
+- **Prompt cache is NOT shared across sub-agents**: each sub-agent has an isolated LLM context, so token usage is several times that of the main agent. Plan budget accordingly.
+- **The sub-agent writes the chapter draft directly to disk** via the host runtime's file-writing tool (saved as a file, NOT returned in the task result text). The main agent reads the return value and appends detail questions into `questions.json`.
 - **Invoke once per chapter**. Bundling all chapters into one `task` call defeats the purpose (isolated contexts disappear).
 
-**When the `task` tool is unavailable**, the main agent performs STEP A-F itself per chapter (pre-v2 behaviour).
+**When the `task` tool (or its equivalent) is unavailable**, the main agent performs STEP A-F itself per chapter as a fallback.
 
 ---
 
@@ -533,7 +533,7 @@ Each Layer 1 chapter **exhaustively lists the "overview table" for that language
    - Etc., using the patterns from outline-tables.md for the target language.
 3. Render the result as an **exhaustive Markdown table** — no omissions. 1 entity = 1 row.
 4. Always add a **Confidence label** in each cell (🟢 VERIFIED / 🟡 INFERRED / 🔴 ASSUMED):
-   - 🟢: the file of that entity was confirmed via `file_editor view`
+   - 🟢: the file of that entity was confirmed by reading it with the Read tool
    - 🟡: only the `grep` hit was confirmed; body unread
    - 🔴: inference based on framework-typical behaviour
 5. The summary column is 1 line (≤ 80 characters). **Do not write detailed logic** — leave that to Layer 3 deep-dives.
@@ -715,7 +715,7 @@ Reflect the answer into the corresponding entry in `questions.json`:
 
 ### Re-reconnaissance (only when needed)
 
-If the answer makes additional investigation necessary, re-`file_editor view` the relevant code as an extra step in Phase 3 and update the chapter.
+If the answer makes additional investigation necessary, re-read the relevant code with the Read tool as an extra step in Phase 3 and update the chapter.
 
 ### Phase 5 completion criteria
 
@@ -1163,6 +1163,7 @@ For long-running analysis sessions, record progress / established facts / unreso
 
 ## Versioning and changelog
 
+- v0.4.1 (2026-06-11): OSS neutrality patch. Remove runtime-specific terminology that leaked in from an internal staging fork so the skill reads correctly when consumed standalone in Claude Code (or any host runtime). `file_editor view` references throughout Phase 3 / Phase 5 and `references/outline-tables.md` are replaced with neutral "read with the Read tool" language. The Phase 3 sub-agent "important constraints" block drops references to a specific runtime SDK / `threading.Lock` / specific LLM-subscription tiers; the spec now describes constraints in runtime-agnostic terms. Phase 0 Step 3's harness-hint paragraph generalises "userUiLanguage hint from the parent harness" to "UI-language hint from the host runtime". The lingering "pre-v2 behaviour" generation label is replaced with "fallback". No functional behaviour change; this is documentation/wording only.
 - v0.4.0 (2026-06-09): English-base migration. The entire skill bundle — SKILL.md, agents/, templates/, references/, and the docstrings/messages of scripts/ — is now English-base. When `output_language == "ja"`, the agent dynamically renders deliverable text (chapter body, AskUserQuestion bodies, progress messages, etc.) in Japanese while preserving every machine-readable element (REF markers, JSON keys, file slugs, ID prefixes, the literal `## Sources Read` heading) verbatim. Principle #11 default flips from `"ja"` to `"en"`. README structure flipped to English-first with a Japanese-version section below. No new functional changes; this release is a language-base transition.
 - v0.3.0 (2026-06-08): Depth modes (`comprehensive` / `outline` / `interactive`) introduced for large codebases. Phase 1 end prompts the user to select the mode based on file count; Phase 2/3/4/6 branch accordingly. `outline` mode generates Layer 1 chapters (Modules / Entities / Actions / Data / Dependencies overview tables) and Layer 2 (Mermaid diagrams) with a "deep-dive candidates" list at the end of each chapter. `interactive` mode adds **Phase 6.5: Deep-dive acceptance mode** where `chapter-investigator` is invoked on-demand to author a comprehensive-quality partial chapter. Confidence labels (🟢 VERIFIED / 🟡 INFERRED / 🔴 ASSUMED) become mandatory per table cell. New `references/outline-tables.md` (341 lines covering 6 stacks — Ruby/Rails, Python/Django, JS/TS/React, Go, Java/Kotlin Spring Boot — with ripgrep enumeration patterns, Mermaid templates, and deep-dive selection rules). `coverage-check.py` extended with outline-mode validations.
 - v0.2.0 (2026-06-06): Battle-hardened revision from a 1095-file Ruby on Rails codebase pilot. Phase 3 restructured around STEP A-G (Sources Read → quote extraction → body authoring → uncertainty markers → detail questions → critical handling → per-chapter sub-agent delegation). Phase 4 gains explicit loopback with 11 quantitative validations. Phase 5 makes the 3-stage dialogue mandatory with anti-padding rules. inventory-units.md gains granularity rules and a 14-unit Ruby on Rails catalog. Output language selection gains a default policy (`"ja"` at the time). New scripts: source-map.py, build-trace.py, build-traceability.py. coverage-check.py expanded to 11-item verification. New agent definition: agents/chapter-investigator.md.
