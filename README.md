@@ -232,6 +232,11 @@ cc-rsg/
         │   ├── batch-system.md
         │   ├── api-service.md
         │   └── library-sdk.md
+        ├── variants/
+        │   └── B/                       # Optional Context Optimization mode B
+        │       ├── README.md            # When and how to activate mode B
+        │       ├── SKILL.phase3-stepG.md  # Phase 3 STEP G override
+        │       └── chapter-investigator.md  # Mode-B sub-agent (return-value contract)
         └── scripts/
             ├── source-map.py            # Phase 2: source unit auto-extraction
             ├── build-trace.py           # End of Phase 3 / Phase 4: build trace.json from [REF:] markers
@@ -243,7 +248,7 @@ cc-rsg/
 
 ## Status
 
-Currently **v0.4.1** (English-base; runtime-agnostic phrasing).
+Currently **v0.5.0** (intent-vs-delivery enforcement + post-pilot quality hardening).
 
 ### Known Limitations
 
@@ -257,7 +262,8 @@ Currently **v0.4.1** (English-base; runtime-agnostic phrasing).
 - ~~v0.2: Per-chapter sub-agent delegation, Phase 4 loopback verification, granularity rules, Rails catalog, output-language selection~~ (done)
 - ~~v0.3: Depth modes (comprehensive / outline / interactive), Phase 6.5 interactive deep-dive, outline-tables.md~~ (done)
 - ~~v0.4: English-base migration of the entire skill bundle; bilingual output via `output_language`; README flipped to English-first~~ (done)
-- v0.5: UI for custom categories, templates added based on user feedback
+- ~~v0.5: Mermaid styling contract (host-themed palette), `user_custom_deliverables` enforcement, strict `[REF: path:line]` format, Phase 5 skip prevention, intent-vs-delivery audit, optional Context Optimization mode B variant~~ (done)
+- v0.6: UI for custom categories, templates added based on user feedback
 - v1.0: Stable release after several real-project applications
 
 ---
@@ -549,6 +555,11 @@ cc-rsg/
         │   ├── batch-system.md
         │   ├── api-service.md
         │   └── library-sdk.md
+        ├── variants/
+        │   └── B/                       # オプションの Context Optimization mode B
+        │       ├── README.md            # mode B の使いどころと活性化方法
+        │       ├── SKILL.phase3-stepG.md  # Phase 3 STEP G の上書き
+        │       └── chapter-investigator.md  # mode B 用 sub-agent(return-value 契約)
         └── scripts/
             ├── source-map.py            # Phase 2: ソースユニット自動抽出
             ├── build-trace.py           # Phase 3末/Phase 4: [REF:] からの trace.json 生成
@@ -560,7 +571,7 @@ cc-rsg/
 
 ## 開発状況
 
-現在 **v0.4.1**(英語ベース完全移行、ランタイム非依存表現に整理)。
+現在 **v0.5.0**(intent-vs-delivery 検証 + 試験運用フィードバックの品質強化)。
 
 ### 既知の制約
 
@@ -574,7 +585,8 @@ cc-rsg/
 - ~~v0.2: 章単位サブエージェント delegation、Phase 4 ループバック検証、粒度規定、Rails カタログ、出力言語選択~~(済)
 - ~~v0.3: depth モード(comprehensive / outline / interactive)、Phase 6.5 対話深掘りモード、outline-tables.md~~(済)
 - ~~v0.4: スキル本体一式の英語ベース化、`output_language` によるバイリンガル出力、README 英語先頭化~~(済)
-- v0.5: カスタムカテゴリのUI追加、利用フィードバックを受けたテンプレート追加
+- ~~v0.5: Mermaid 配色契約(ホストテーマパレット)、`user_custom_deliverables` 強制化、strict `[REF: path:line]` 形式、Phase 5 skip 防止、intent-vs-delivery 監査、Context Optimization mode B(オプション)~~(済)
+- v0.6: カスタムカテゴリのUI追加、利用フィードバックを受けたテンプレート追加
 - v1.0: 数件の実プロジェクト適用後、安定版として公開
 
 ---
