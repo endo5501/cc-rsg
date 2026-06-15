@@ -630,4 +630,4 @@ For Rails applications, always extract by the following units. **An `inventory.j
 | Medium (500 .rb) | 50 | controllers 30, models 50, services 20, jobs 10, migrations 30, routes 15, helpers 10 |
 | Large (1,000+ .rb) | 90+ | controllers 80, models 80, concerns 20, services 30, jobs 20, migrations 100+, routes 30 |
 
-Example: Redmine is 1,095 .rb files → at least **93 INVs** are required (an agent that stops at 30 is under-granular).
+Example: a medium Rails codebase with ~1,000 .rb files → at least ~90 INVs are required (an agent that stops at 30 is under-granular).

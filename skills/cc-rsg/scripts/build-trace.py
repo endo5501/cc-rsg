@@ -164,7 +164,7 @@ def resolve_refs_to_units(refs: list[dict], units: list[dict]) -> dict[str, list
             candidates.extend(units_by_path[ref_path])
         else:
             # Suffix match (e.g. the agent writes `app/models/issue.rb`
-            # while source-map records `<workspace>/app/models/issue.rb` — the
+            # while source-map records `app/models/issue.rb` — the
             # common shape).
             for path, ulist in units_by_path.items():
                 if path.endswith("/" + ref_path) or ref_path.endswith("/" + path):

@@ -3,8 +3,7 @@ name: chapter-investigator
 description: |
   Sub-agent that investigates a single cc-rsg chapter in an isolated context.
   Receives a chapter number, the assigned inventory_ids, and the quality
-  gates from the main agent, reads the real source code with the Read tool,
-  and writes the chapter into drafts/{NN}-{slug}.md.
+  gates from the main agent, reads the real source code with the Read tool, and writes the chapter into drafts/{NN}-{slug}.md.
 model: inherit
 color: cyan
 tools: Read, Write, Edit, Bash, Glob, Grep
@@ -57,18 +56,39 @@ List the read files at the top of the chapter:
 - `app/models/issue.rb` (lines 1-440)
 - `app/models/project.rb` (lines 1-690)
 - `app/models/user.rb` (lines 1-220)
-- `db/migrate/0042_create_issues.rb` (lines 1-50)
-- `app/models/concerns/issue_relations.rb` (lines 1-95)
+- `db/migrate/0042_create_orders.rb` (lines 1-50)
+- `app/models/concerns/soft_delete.rb` (lines 1-95)
 ```
+
+> Examples shown use Rails conventions. For catalogues covering PHP /
+> Python (FastAPI / Django) / Java (Spring) / JavaScript & TypeScript
+> (Express / Fastify / Hono) / Ruby on Rails, see
+> `references/inventory-units.md`.
+
 
 ### STEP B: Citation extraction (mandatory)
 
-Extract at least **10 concrete citations** from the read code:
+Extract at least **10 concrete citations** from the read code, all in **exactly one format**:
+
+```
+[REF: <workspace-relative path>:<Lstart>]
+[REF: <workspace-relative path>:<Lstart>-<Lend>]
+```
+
+Examples:
 
 ```
 [REF: app/models/issue.rb:42-56]
 [REF: app/models/issue.rb:120-145]
+[REF: config/routes.rb:7]
 ```
+
+**Strict format requirements** (the spec viewer parses these citations to make each one click-through to the source file; any variant format renders as plain text and breaks the reviewer experience):
+
+- Use **`[REF: path:line]` or `[REF: path:start-end]` only**. The brackets, the `REF:` prefix, and the colon between path and line numbers are mandatory.
+- The path is workspace-relative (`app/...` etc.). Absolute paths are forbidden.
+- Line numbers are plain integers. Single line = `:42`; range = `:42-56`. Do NOT use `L42`, `line 42`, ` lines 42-56`, parentheses, or any other decoration.
+- Forbidden variants include: `Gemfile (lines 1-138)`, `<!-- Gemfile lines 1-138 -->`, `// app.js lines 1-5`, `[REF: Gemfile L1-L138]`, `[REF: Gemfile, lines 1-138]`, `[REF: Gemfile]` (no lines at all).
 
 Cover class definitions, key methods, validations, callbacks, exception handling, etc. **Line ranges must be precise** (coarse ranges like `:1-500` are not acceptable).
 
@@ -117,7 +137,7 @@ The main agent reads this and appends the questions to `questions.json`.
 
 - **Writing a chapter without opening the code** (filling it with framework "typical behaviour" only)
 - **Generating multiple files in one script**
-- **Writing files via Bash `>` redirection or heredoc** (always use the Write or Edit tool)
+- **Writing files via shell `>` redirection or heredoc** (always use Write / Edit)
 - **Embedding absolute paths (`/home/...` etc.) in the deliverable** (always use workspace-relative paths)
 - **Citing files that are not in Sources Read**
 
@@ -125,7 +145,7 @@ The main agent reads this and appends the questions to `questions.json`.
 
 ## What to return on completion
 
-Your `task` return-value text MUST include the following:
+Your `Task` tool return-value text MUST include the following:
 
 ```
 Chapter NN written to .cc-rsg/drafts/NN-slug.md (XXX lines, NN refs, N code blocks, N mermaid)

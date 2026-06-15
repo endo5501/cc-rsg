@@ -12,15 +12,15 @@ This skill operates in the "code → spec" direction; it is the symmetric counte
 
 > **🌐 Language policy: English is the base language; Japanese is opt-in.**
 >
-> The default for `goal.json.output_language` is `"en"` (or a hint
-> pre-set by the harness, if any). Phase 0 MUST ask the user to
-> confirm. After Phase 0, **all deliverables follow
+> The default for `goal.json.output_language` is `"en"` (or the user's
+> UI-language hint passed from the parent harness). Phase 0 MUST ask
+> the user to confirm. After Phase 0, **all deliverables follow
 > `output_language`**: en (default) → English; ja → Japanese.
 >
 > Internal markers, JSON keys, file names (ASCII slug), `[REF: ...]`,
 > `[CONFIDENCE: ...]`, enum values, and the literal heading `## Sources Read`
 > stay **English forever** regardless of `output_language`. The entire
-> skill bundle (SKILL.md, `agents/`, `templates/`, `references/`,
+> skill bundle (SKILL.md, `agents/`, `variants/`, `templates/`, `references/`,
 > and `scripts/` docstrings/messages) is English-base. When
 > `output_language == "ja"`, the agent renders deliverable text
 > (chapter body, AskUserQuestion bodies, progress messages, etc.) in
@@ -42,7 +42,33 @@ This skill operates under the following 11 principles. They are mutually reinfor
 8. **The dialogue protocol is Claude-driven**: Choice-based questions are the default; free-form input is a fallback. AskUserQuestion-style choice UIs are exploited to the maximum.
 9. **Unanswerable questions are marked `abandoned`**: They are explicitly recorded in the final spec under "unresolved items", never hidden.
 10. **Dual-consumer handling is reduced to one in goal definition**: If multiple views are needed, restart instead of overloading a single spec.
-11. **Output language is chosen in Phase 0 (English / 日本語) — English is the BASE language as of v0.4.0**: The very first dialogue is bilingual (English first, then Japanese). The default selection falls back to `"en"` (a parent harness, if any, may pre-set the hint). The answer is persisted to `.cc-rsg/goal.json` as `output_language` (`"en"` or `"ja"`). All subsequent natural-language output — AskUserQuestion bodies and choices, progress messages, confirmation summaries, generated spec body and chapter titles, `questions.json` `body` / `answer`, Phase 4 verification reports, resume messages — uses that language. Internal identifiers and machine-readable elements — state keys (`current_phase` etc.), IDs (`Q-XXX` / `INV-XXX`), file names (ASCII slug), `[REF: file:lines]`, `[CONFIDENCE: HIGH|MED|LOW]`, `[ASK SME]`, `[ASSUMED: ...]`, `[BLOCKED: ...]` marker names, and `goal.json` enum values (`primary_reader: "maintenance_developer"` etc.) — stay English **regardless of `output_language`**. The literal `## Sources Read` heading also stays English (so `coverage-check.py` pattern-matches it). The entire skill bundle (this SKILL.md, `agents/`, `templates/*.md`, `references/*.md`, and `scripts/*.py` docstrings / messages) is English-base. When `output_language == "ja"`, the agent dynamically renders deliverable text (chapter body, AskUserQuestion bodies, progress messages, etc.) in Japanese while preserving every machine-readable element verbatim.
+11. **Output language is chosen in Phase 0 (English / 日本語) — English is the BASE language**: The very first dialogue is bilingual (English first, then Japanese). The default selection is provided by the parent harness's initial prompt (the user's UI-language hint; falls back to `"en"`). The answer is persisted to `.cc-rsg/goal.json` as `output_language` (`"en"` or `"ja"`). All subsequent natural-language output — AskUserQuestion bodies and choices, progress messages, confirmation summaries, generated spec body and chapter titles, `questions.json` `body` / `answer`, Phase 4 verification reports, resume messages — uses that language. Internal identifiers and machine-readable elements — state keys (`current_phase` etc.), IDs (`Q-XXX` / `INV-XXX`), file names (ASCII slug), `[REF: file:lines]`, `[CONFIDENCE: HIGH|MED|LOW]`, `[ASK SME]`, `[ASSUMED: ...]`, `[BLOCKED: ...]` marker names, and `goal.json` enum values (`primary_reader: "maintenance_developer"` etc.) — stay English **regardless of `output_language`**. The literal `## Sources Read` heading also stays English (so `coverage-check.py` pattern-matches it). The entire skill bundle (this SKILL.md, `agents/`, `variants/`, `templates/*.md`, `references/*.md`, and `scripts/*.py` docstrings / messages) is English-base. When `output_language == "ja"`, the agent dynamically renders deliverable text (chapter body, AskUserQuestion bodies, progress messages, etc.) in Japanese while preserving every machine-readable element verbatim.
+
+---
+
+## Mermaid styling contract (mandatory)
+
+Every Mermaid diagram emitted into `drafts/` or `final/` MUST be **structure-only — no color, no node-level fill, no per-node styling**. The rendering host supplies a theme-aware palette via CSS variables (`--mermaid-node-bg`, `--mermaid-line`, etc.) and switches it on light / dark / auto theme changes. Hardcoded colors in the diagram source **override the host palette**, break dark mode, and look "decorated by whim" because the agent has no spec-defined convention to follow.
+
+**Forbidden** in Mermaid source:
+
+- ❌ `style A fill:#e1f5ff` / `style B fill:#fff9c4` / any per-node `style ... fill:`
+- ❌ `classDef foo fill:#...` / `class A foo` color-bearing class definitions
+- ❌ `stroke:#...` / `color:#...` / any hex / rgb / named-color literal anywhere in the diagram body
+- ❌ `linkStyle 0 stroke:#...,stroke-width:3px` (color part forbidden; width-only is fine)
+
+**Allowed** (these convey structure, not decoration):
+
+- ✅ Edge arrow types (`-->`, `-.->`, `==>`, `--x`, `--o`)
+- ✅ Edge labels (`A -->|owns| B`)
+- ✅ Node shapes (`A[...]`, `A(...)`, `A{...}`, `A>...]`, `A((...))`) — shape carries meaning (rectangle / round / diamond / etc.)
+- ✅ Subgraphs (`subgraph Group ... end`) for grouping
+- ✅ Diagram types (`graph TB`, `flowchart LR`, `sequenceDiagram`, `erDiagram`, `stateDiagram-v2`, `classDiagram`)
+- ✅ Direction modifiers (`TB`, `LR`, etc.) on the top line
+
+**Why this contract exists**: in a previous run the agent emitted `style A fill:#e1f5ff` etc. in one chapter (and only one chapter, inconsistently), picking pale Material-Design colors based on its own interpretation of node semantics. There is **no convention recorded in this skill** that maps semantics to colors, so any color the agent picks is fabricated. Removing color from the source lets the host's themed palette do its job consistently across all diagrams.
+
+If a particular node needs visual emphasis, use **shape** (e.g. diamond for decision, double-circle for terminal state) — not color.
 
 ---
 
@@ -89,16 +115,22 @@ Right after the skill starts, fix the scope and the goal. Every later decision d
        2. `日本語 (Japanese)`
      - `allow_multiple = false`, `allow_free_text = false`
    - Map the selected label to `output_language`: `English` → `"en"`, `日本語 (Japanese)` → `"ja"`. Persistence to `goal.json` happens together with the other answers in Step 5.
-   - **Default policy (English-base, effective v0.4.0)**: when the user submits without changing the highlighted choice, treat the answer as `"en"`.
-   - **Harness hint precedence (optional)**: if a parent runtime supplies a UI-language hint in the initial prompt, use it to decide which choice is **pre-highlighted** (`en` highlights `English`; `ja` highlights `日本語 (Japanese)`). The hint never overrides the user's explicit selection. Priority order:
+   - **Default policy (English-base)**: when the user submits without changing the highlighted choice, treat the answer as `"en"`. This matches the cc-rsg upstream policy.
+   - **Parent-harness hint precedence**: when the parent harness injects a `userUiLanguage` hint into the initial prompt, use that hint to decide which choice is **pre-highlighted** (`en` highlights `English`; `ja` highlights `日本語 (Japanese)`). The hint never overrides the user's explicit selection. Priority order:
      1. The user's explicit click in this step (highest)
-     2. Runtime-supplied UI-language hint (if any)
+     2. `userUiLanguage` hint passed from the parent harness's initial prompt
      3. Hard default `"en"` (lowest)
    - **All natural-language output from Step 4 onward** — `AskUserQuestion` bodies and choices, confirmation summaries, chapter titles, generated spec body, `questions.json` body text, etc. — is rendered in the language selected here (see Design Principle #11).
    - **Resume mode**: when `.cc-rsg/goal.json` already exists, read the persisted `output_language` and skip this step entirely.
 
 4. **Run the 5 goal-definition questions**
    - Use `AskUserQuestion` to ask the following 5 questions in sequence. **Question bodies, choice labels, and free-form-input placeholders are all rendered in the `output_language` selected in Step 3.** The choice labels below are shown when `output_language == "en"`; the agent dynamically translates them when `output_language == "ja"` (enum values such as `primary_reader: "maintenance_developer"` stay as language-independent English enums in `goal.json`). Each question is choice-based first with a free-form field as a fallback.
+   - **Question-text quality contract (applies to every `AskUserQuestion` call in every phase, especially when translating into `output_language == "ja"`)**:
+     1. **NEVER JSON-escape characters.** Emit raw UTF-8 only. If you find yourself writing `あ` or any other `\uXXXX` form inside the `question` or `choices` strings, that is a defect — decode it before emitting. A user who sees `次の中` on screen will reject the run.
+     2. **Use only standard Japanese kanji.** Stay within JIS Level 1 / 常用漢字 / 人名用漢字. Do NOT mix in Chinese-simplified variants (e.g. `优 (Chinese)` ← write `優 (Japanese)`; `寸叧` is not a valid word — `対応` is). The runtime has no automatic fix for these; they reach the user verbatim.
+     3. **Self-check before emit.** After translating a label to Japanese, mentally re-read it. If any kanji feels unusual for the surrounding context — e.g. `妊` (pregnancy) appearing in `業務妊当性` instead of `妥` (`妥当性` = validity) — regenerate the entire label. Common confusion pairs to double-check: 妥/妊, 暑/署, 復/複, 製/制, 即/則.
+     4. **No invented characters / kanji.** If you are unsure of a kanji, use kana (e.g. write `たいおう` instead of `寸叧`). Hiragana is always safer than a wrong kanji.
+     5. These rules apply to **`AskUserQuestion` bodies and choices**, but they do NOT relax the rule that JSON keys, enum values, file names, and machine-readable markers stay English (see Principle #11).
 
    **Q1. Who is the primary reader of the spec?**
    - Maintenance developer
@@ -135,8 +167,15 @@ Right after the skill starts, fix the scope and the goal. Every later decision d
    - Existing docs / want to retire
    - Other (free-form)
 
-5. **Persist to `goal.json`**
-   - Save the language choice from Step 3 and the 5 answers from Step 4 as a structured `goal.json` under `.cc-rsg/`. Schema:
+5. **Extract `user_custom_deliverables` from `free_text_notes`**
+   - **Mandatory.** Before persisting `goal.json`, scan `free_text_notes` for explicit deliverable filenames using the regex `\b[a-z][a-z0-9_-]*\.md\b` (case-insensitive). De-duplicate and exclude any name matching the chapter-naming regex `^(0\d|[1-9]\d)-[a-z0-9-]+\.md$` or the reserved names `00-metadata.md` / `99-unresolved.md` / `traceability.md` (those are handled by the standard chapter pipeline).
+   - The remaining names are **user-promised custom deliverables**. They MUST appear in `final/` at Phase 6 completion; missing any of them is a hard failure (check 12 in `coverage-check.py`).
+   - Example: `free_text_notes = "顧客向けドキュメント。Mermaid図による視覚的説明と、紙芝居的な manual.md を含める。"` → `user_custom_deliverables = ["manual.md"]`.
+   - If the free-form text is empty or contains no `*.md` references, the list is `[]`.
+   - User-custom files are **exempt from comprehensive per-chapter quality gates** (the 200-lines / 10-REFs / Mermaid / Sources Read minimums) because their quality bar is the user's intent recorded in `free_text_notes`, not the source-derived spec-chapter bar. Only existence + non-empty body is enforced.
+
+6. **Persist to `goal.json`**
+   - Save the language choice from Step 3, the 5 answers from Step 4, and the `user_custom_deliverables` array from Step 5 as a structured `goal.json` under `.cc-rsg/`. Schema:
 
    ```json
    {
@@ -146,12 +185,14 @@ Right after the skill starts, fix the scope and the goal. Every later decision d
      "granularity": "medium",
      "perspectives": ["functional_correctness", "operational"],
      "existing_docs": "none",
-     "free_text_notes": "..."
+     "free_text_notes": "...",
+     "user_custom_deliverables": ["manual.md"]
    }
    ```
    - `output_language` is required and must be `"en"` or `"ja"`. Other enum fields (`primary_reader`, `reader_action`, `granularity`, `perspectives`, `existing_docs`) are language-independent English enums (localized only at display time using `output_language`).
+   - `user_custom_deliverables` is a (possibly empty) array of file names that the user explicitly requested in `free_text_notes`. These bypass the chapter-naming regex; their filenames are preserved verbatim. Phase 2 adds them to `wbs.json` as `kind: "user_custom"` chapters; Phase 6 verifies every one of them exists in `final/`.
 
-6. **Phase 0 complete**
+7. **Phase 0 complete**
    - Update `state.json` and proceed to Phase 1.
 
 ### Phase-specific cautions
@@ -202,7 +243,7 @@ Get a rough mental model of the codebase via a shallow reconnaissance, then pick
      - When existing docs disagree with the code, which is authoritative?
    - See "Question Bank operation" below for the structure used at registration.
 
-5. **Depth-mode decision (scale-based)**
+5. **🆕 depth-mode decision (scale-based)**
    - Record the **total file count** observed during reconnaissance at the top of `recon-report.md`. Persist as `total_files` in `.cc-rsg/state.json`.
    - **If file count > 200**, ask the user with `AskUserQuestion` to choose a **depth mode**:
      - `comprehensive`: classic behaviour. All chapters detailed, full MECE, full REFs. **Recommended only when exhaustive coverage is required (audit, regulatory).** Takes hours to days.
@@ -232,11 +273,13 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
 ### Procedure
 
 1. **Apply the chapter file naming convention and generate the skeleton**
-   - Every chapter file follows the convention below. Free naming by Claude is forbidden.
-     - **File name**: `{NN}-{slug}.md`
+   - Every chapter file falls into one of three kinds; free naming by Claude is forbidden.
+     - **Standard chapter** (`kind: "standard"`): `{NN}-{slug}.md`
        - `NN`: zero-padded two-digit chapter number (`00`-`99`)
        - `slug`: ASCII lowercase + digits + hyphens only (e.g. `01-overview.md`, `04-oauth-oidc.md`)
        - Strict regex: `^(0\d|[1-9]\d)-[a-z0-9-]+\.md$`
+     - **Reserved chapter** (`kind: "reserved"`): one of `00-metadata.md` / `99-unresolved.md` / `traceability.md`.
+     - **User-custom chapter** (`kind: "user_custom"`): every file name listed in `goal.json.user_custom_deliverables` (e.g. `manual.md`, `quickstart.md`). The relaxed regex `^[a-z][a-z0-9_-]*\.md$` applies; the user-provided file name is preserved verbatim.
      - **Chapter title in body**: handled independently of the file name. Rendered in `goal.json.output_language` (EN example: `# Chapter 1: Overview` / JA example: `# 第1章: 概要`).
      - **Chapter numbers are assigned by the main agent in Phase 2** and fixed in `wbs.json.chapters[].file_name`. Sub-agents never decide naming; they save under the file name handed down by the main agent.
    - **Reserved numbers / file names** (must always be generated):
@@ -244,15 +287,86 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
      - `99-unresolved.md` (unresolved-items chapter)
      - `traceability.md` (traceability table, no chapter number)
    - Regular chapter numbers are assigned sequentially in `01`-`98` while avoiding collisions with reserved numbers.
-   - **When to generate them**: at Phase 2, create empty chapter files under `drafts/` for all chapters including the metadata, unresolved-items, and traceability chapters (the body will be filled in Phase 3 / Phase 6).
+   - **When to generate them**: at Phase 2, create empty chapter files under `drafts/` for all chapters — standard, reserved, AND user-custom — so every chapter has a skeleton to fill (the body is filled in Phase 3 / Phase 5 / Phase 6 depending on `kind`).
    - Place a meta comment (`<!-- meta: ... -->`) at the top of each chapter file describing what that chapter covers.
    - The skeleton of `00-metadata.md` carries a meta comment indicating "Phase 6 will write goal.json snapshot / generation timestamp / commit hash / template selection result here".
    - The skeleton of `99-unresolved.md` carries a meta comment indicating "Phase 6 will aggregate `abandoned` entries from `questions.json` here".
    - The skeleton of `traceability.md` carries a meta comment indicating "Phase 6 will write the chapter/section → source mapping table here".
+   - Every user-custom skeleton carries a meta comment indicating "Phase 3/5 will fill this chapter per the user's intent recorded in `goal.json.free_text_notes`; Phase 6 verifies it exists in `final/` via check 12 (existence + non-empty body)."
+
+   #### Skeleton content contract (strict)
+
+   The Phase 2 skeleton is **deliberately near-empty**. Every chapter draft file created in Phase 2 must contain **exactly** the following, and **nothing else**:
+
+   1. The `<!-- meta: ... -->` comment line described above.
+   2. One blank line.
+   3. The chapter title `#` heading, rendered in `goal.json.output_language`.
+   4. (Optional, for `standard` chapters only) a single placeholder line `## Sources Read\n\n(to be filled in Phase 3)` — the literal `## Sources Read` heading is preserved verbatim in English even when output language is Japanese, because `coverage-check.py` matches on the English string.
+
+   Total body length per skeleton MUST be **≤ 5 non-blank lines** outside of code fences. This cap is the structural enforcement of "Phase 2 ≠ Phase 3".
+
+   **Forbidden in Phase 2 skeletons** (writing any of these is a contract violation and rolls back the file):
+
+   - ❌ Entity / module / route / endpoint tables (those are Phase 3 STEP A-C outputs based on real `glob`/`grep`/`view` reads of the codebase).
+   - ❌ `[REF: path:line]` citations (Phase 3 STEP B).
+   - ❌ Mermaid diagrams (Phase 3 outline-mode OUT-B for `06-diagrams.md`).
+   - ❌ Confidence labels (🟢/🟡/🔴) — these belong to populated tables, not skeletons.
+   - ❌ Prose explaining "what this module / class does" — that's Phase 3's job after `view`-ing the file.
+   - ❌ Cross-references like "see Chapter 5" before Phase 3 has actually decided Chapter 5's content.
+   - ❌ Any sentence written from training-data knowledge of the framework / library / project. Phase 2 has NOT read the code yet; anything written here would be guessed, not grounded.
+
+   **Why this restriction exists**: previous runs had Phase 2 writing 300+ line "skeletons" filled with entity tables (Confidence 🟡 = "grep hit unread"), generated from the model's prior knowledge of Rails / Django / etc., not from the actual repository. Phase 3 then either rubber-stamps that unverified content into `final/`, or re-does the work redundantly. The fix is to make the skeleton structurally too small to hold body content — if you find yourself wanting to write a table or a [REF:], you are no longer building a skeleton, you are doing Phase 3 work, **STOP**.
+
+   **Example of a correct skeleton** (standard chapter; the title heading and placeholder text are rendered in `output_language` — EN shown here, JA variant shown after):
+
+   ```markdown
+   <!-- meta: Entities table - exhaustive listing of models/structs/types/classes/interfaces -->
+
+   # Chapter 2: Entities
+
+   ## Sources Read
+
+   (to be filled in Phase 3)
+   ```
+
+   JA equivalent (when `output_language == "ja"`):
+
+   ```markdown
+   <!-- meta: Entities table - exhaustive listing of models/structs/types/classes/interfaces -->
+
+   # 第2章: エンティティ
+
+   ## Sources Read
+
+   (Phase 3 で記入予定)
+   ```
+
+   Note that the meta comment and the `## Sources Read` heading stay English in BOTH variants (they are structural markers `coverage-check.py` and the chapter pipeline match on). Only the chapter title (`# Chapter 2: Entities` / `# 第2章: エンティティ`) and the placeholder phrase switch by `output_language`.
+
+   That is the entire file. No table. No entity names. No `belongs_to` notes. No diagrams. Phase 3 fills the rest after reading the real source.
+
+   **Example of a violating skeleton** (do NOT do this in Phase 2 — EN shown for illustration):
+
+   ```markdown
+   <!-- meta: Entities table - ... -->
+
+   # Chapter 2: Entities
+
+   ## 2.1 Core entities
+
+   | Entity | File | Description | Status |
+   |---|---|---|---|
+   | `Issue` | `app/models/issue.rb` | A tracked unit of work | 🟡 |
+   | `Project` | `app/models/project.rb` | Container for issues | 🟡 |
+   ...
+   ```
+
+   Even though the table looks plausible, it was written without reading `issue.rb` — the 🟡 label means "grep hit only, body unread", which Phase 2 has no business claiming. Save this for Phase 3 where the table cells get grounded in actual `view` output.
 
 2. **Create the WBS**
    - Define sub-tasks that fill each chapter. The model is "1 sub-task = 1 sub-agent".
    - Sub-task granularity: split each sub-task to "a size that preserves accuracy". Too big → coarse output; too small → overhead.
+   - **Include every user-custom deliverable** from `goal.json.user_custom_deliverables` as a `chapters[]` entry with `kind: "user_custom"`. These chapters share the existence/non-empty gate (check 12) but are exempt from comprehensive per-chapter gates (200 lines / 10 REFs / Mermaid / Sources Read); their quality bar is defined by the user's intent (`source_intent`) confirmed via Phase 5 dialogue.
    - Save the WBS to `wbs.json`. Schema:
 
    ```json
@@ -262,7 +376,17 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
          "chapter_id": "ch-01-overview",
          "chapter_title": "Chapter 1: Overview",
          "file_name": "01-overview.md",
+         "kind": "standard",
          "assigned_inventory_ids": ["INV-001", "INV-002"],
+         "status": "pending"
+       },
+       {
+         "chapter_id": "ch-manual",
+         "chapter_title": "Customer Manual",
+         "file_name": "manual.md",
+         "kind": "user_custom",
+         "source_intent": "顧客向けドキュメント。Mermaid図による視覚的説明と、紙芝居的なmanual.mdを含める。",
+         "assigned_inventory_ids": [],
          "status": "pending"
        }
      ]
@@ -270,8 +394,9 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
    ```
    <!-- chapter_title example: EN "Chapter 1: Overview" / JA "第1章: 概要" — chosen by output_language -->
 
-   - `file_name` is required and must satisfy the regex above (`^(0\d|[1-9]\d)-[a-z0-9-]+\.md$`).
-   - The three files `00-metadata.md` / `99-unresolved.md` / `traceability.md` appear in the `chapters` array but with an empty `assigned_inventory_ids` array; Phase 6 fills their bodies.
+   - `file_name` is required; for `kind: "standard"` it must match `^(0\d|[1-9]\d)-[a-z0-9-]+\.md$`; for `kind: "reserved"` it must be one of the three reserved names; for `kind: "user_custom"` it must match `^[a-z][a-z0-9_-]*\.md$` AND appear in `goal.json.user_custom_deliverables`.
+   - The three files `00-metadata.md` / `99-unresolved.md` / `traceability.md` appear with `kind: "reserved"` and an empty `assigned_inventory_ids` array; Phase 6 fills their bodies.
+   - `source_intent` (user-custom only) verbatim-quotes the snippet of `free_text_notes` that established the deliverable, so Phase 3/5 has the user's words at hand.
 
 3. **Inventory extraction (v2: source-map.py based)**
 
@@ -323,7 +448,7 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
 4. **Map WBS chapters to inventory items**
    - For each inventory item, decide which chapter covers it in the WBS.
 
-5. **Adjust the chapter structure based on depth mode (the mode confirmed in Phase 1)**
+5. **🆕 Adjust the chapter structure based on depth mode (the mode confirmed in Phase 1.5)**
 
    Branch the WBS chapter structure on `.cc-rsg/goal.json`'s `depth_mode`:
 
@@ -361,6 +486,8 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
 - WBS granularity directly drives sub-agent precision. When in doubt, split finer.
 - Skipping the user review causes large rework in Phase 3.
 - **Strictly observe the chapter file naming convention**. Free-form names like `chapter2_architecture.md` or `第3章_認証.md` are NOT allowed. Violations are flagged by `scripts/coverage-check.py`.
+- **Skeleton size cap (mandatory)**: every file under `drafts/` produced in Phase 2 has **≤ 5 non-blank lines** of body outside code fences. Verify this immediately after writing each skeleton (`wc -l drafts/*.md` for a sanity check); a skeleton that is already long has body content that belongs in Phase 3 — delete the body and keep only meta comment + title + (optional) Sources Read placeholder.
+- **Phase 2 does NOT read code**: the only allowed source reads in Phase 2 are (a) for inventory extraction via `source-map.py`, (b) for deciding the depth_mode chapter structure. Reading individual class / model / controller files to write their description is **Phase 3's job**, not Phase 2's. If you catch yourself opening `app/models/issue.rb` to write what `Issue` does, you've crossed into Phase 3 — stop and finish Phase 2 first.
 
 ---
 
@@ -369,7 +496,7 @@ Finalise the skeleton of the spec, decompose the work to fill each chapter into 
 ### Purpose
 Based on the WBS, **read the real source code first, then write each chapter**.
 
-### Depth-mode branching (important)
+### 🆕 depth-mode branching (important)
 
 `.cc-rsg/goal.json`'s `depth_mode` **changes Phase 3's overall behaviour**:
 
@@ -393,9 +520,9 @@ To make "writing a chapter without opening the code" structurally impossible, pe
 
 #### STEP A: Sources Read (mandatory; skipping causes Phase 4 failure)
 
-For every INV in that chapter's `wbs.json.chapters[*].assigned_inventory_ids`, **read the corresponding real source files with the Read tool** (or the equivalent file-reading tool of the host runtime).
+For every INV in that chapter's `wbs.json.chapters[*].assigned_inventory_ids`, **use the Read tool on the corresponding real source files**.
 
-List the read file paths and line ranges at the **top of the chapter under a `## Sources Read` section**:
+List the viewed file paths and line ranges at the **top of the chapter under a `## Sources Read` section**:
 
 ```markdown
 # Chapter 5: Data Model
@@ -404,26 +531,52 @@ List the read file paths and line ranges at the **top of the chapter under a `##
 - `app/models/issue.rb` (lines 1-440)
 - `app/models/project.rb` (lines 1-690)
 - `app/models/user.rb` (lines 1-120)
-- `db/migrate/0042_create_issues.rb` (lines 1-50)
-- `app/models/concerns/issue_relations.rb` (lines 1-95)
+- `db/migrate/0042_create_orders.rb` (lines 1-50)
+- `app/models/concerns/soft_delete.rb` (lines 1-95)
 
 ## 5.1 Overview
 ...
 ```
 
-**Minimum 5 files** under Sources Read. `coverage-check.py` enforces this count. Writing `[REF:]` citations for files that are not listed (or never `view`-ed) is forbidden.
+**Minimum 5 files** under Sources Read. `coverage-check.py` enforces this count. Writing `[REF:]` citations for files that are not listed is forbidden.
+
+> Examples shown use Rails conventions. For catalogues covering PHP /
+> Python (FastAPI / Django) / Java (Spring) / JavaScript & TypeScript
+> (Express / Fastify / Hono) / Ruby on Rails, see
+> `references/inventory-units.md`.
+
 
 #### STEP B: Citation extraction (mandatory)
 
-Extract at least **10 concrete citations** from the viewed code:
+Extract at least **10 concrete citations** from the viewed code, all in **exactly one format**:
+
+```
+[REF: <workspace-relative path>:<Lstart>]
+[REF: <workspace-relative path>:<Lstart>-<Lend>]
+```
+
+Examples:
 
 ```
 [REF: app/models/issue.rb:42-56]
 [REF: app/models/issue.rb:120-145]
-...
+[REF: config/routes.rb:7]
 ```
 
-Cover class definitions, key methods, configuration values, callbacks, validations, exception handling, etc. Line ranges are precise (coarse ranges like `:1-500` are not acceptable).
+**Strict format requirements** (the UI's REF chip click-to-source feature parses these — variant formats render as plain non-clickable text, breaking reviewer flow):
+
+- Use **`[REF: path:line]` or `[REF: path:start-end]` only**. The square brackets, the `REF:` prefix, and the colon between path and line numbers are all mandatory.
+- The path is workspace-relative (`app/...` for an env with `archiveRoot = "myapp-main"`). Absolute paths are forbidden.
+- Line numbers are integers. Use a single line (`:42`) when a single line is being cited; use a range (`:42-56`) when an extent matters. Do NOT use `L42`, `line 42`, ` lines 42-56`, parentheses, or any other decoration.
+- Forbidden alternative forms include but are not limited to:
+  - ❌ `Gemfile (lines 1-138)` — parenthesised line annotation
+  - ❌ `<!-- Gemfile lines 1-138 -->` — HTML comment marker
+  - ❌ `// app.js lines 1-5` — JS-style comment marker
+  - ❌ `[REF: Gemfile L1-L138]` — leading `L`
+  - ❌ `[REF: Gemfile, lines 1-138]` — comma + word "lines"
+  - ❌ `[REF: Gemfile]` — no line numbers at all
+
+Line ranges are precise (coarse ranges like `:1-500` are not acceptable). Cover class definitions, key methods, configuration values, callbacks, validations, exception handling, etc.
 
 #### STEP C: Write the chapter body (required quality bar)
 
@@ -463,7 +616,7 @@ If a critical question is hit, leave the corresponding section as `[BLOCKED: see
 
 #### STEP G: Per-chapter sub-agent delegation (use when the `task` tool is available; recommended)
 
-In environments where the `task` tool (or an equivalent sub-agent invocation mechanism) is available, **delegate each chapter to an isolated `chapter-investigator` sub-agent** (see `agents/chapter-investigator.md`). Writing every chapter directly in the main agent degrades context; investigating each chapter in its own context yields higher quality.
+In environments where the `task` tool is available, **delegate each chapter to an isolated `chapter-investigator` sub-agent**. Writing every chapter directly in the main agent degrades context; investigating each chapter in its own context yields higher quality.
 
 **Sub-agent invocation template:**
 
@@ -479,7 +632,7 @@ Target inventory_ids:
 - INV-014 (User)
 - INV-015 (Role)
 
-Corresponding real sources (read these with the Read tool):
+Corresponding real sources (Read these with the Read tool):
 - app/models/project.rb
 - app/models/issue.rb
 - app/models/user.rb
@@ -509,16 +662,49 @@ in English.
 
 **Important constraints**:
 
-- **Concurrency depends on the host runtime**: some runtimes run sub-agent tasks sequentially (one at a time), others in parallel. Total wall time may not be reduced, but per-chapter isolation improves quality regardless.
-- **Prompt cache is NOT shared across sub-agents**: each sub-agent has an isolated LLM context, so token usage is several times that of the main agent. Plan budget accordingly.
-- **The sub-agent writes the chapter draft directly to disk** via the host runtime's file-writing tool (saved as a file, NOT returned in the task result text). The main agent reads the return value and appends detail questions into `questions.json`.
-- **Invoke once per chapter**. Bundling all chapters into one `task` call defeats the purpose (isolated contexts disappear).
+- **MANDATORY: Emit ALL chapter `task()` calls in a SINGLE assistant turn (parallel dispatch).**
+  This is the most important rule of Phase 3. Read carefully — getting it wrong makes Phase 3 take **N× longer** than it needs to.
 
-**When the `task` tool (or its equivalent) is unavailable**, the main agent performs STEP A-F itself per chapter as a fallback.
+  **WRONG (sequential — DO NOT DO THIS):**
+  ```
+  Assistant turn 1: task("ch-02 ...")             ← issue ONE task
+                    ← wait for the Observation
+  Assistant turn 2: task("ch-03 ...")             ← then issue the next
+                    ← wait
+  Assistant turn 3: task("ch-06 ...")
+                    ...
+  ```
+  This pattern serialises everything. If each `chapter-investigator` takes 4 minutes and you have 8 chapters, Phase 3 takes ~32 minutes. The runtime's sub-agent concurrency pool is **wasted** because you only ever have 1 sub-agent in flight at a time.
+
+  **CORRECT (parallel — REQUIRED):**
+  ```
+  Assistant turn 1: task("ch-02 ...")
+                    task("ch-03 ...")
+                    task("ch-06 ...")
+                    task("ch-08 ...")
+                    task("ch-11 ...")
+                    ... (one task() per chapter, ALL emitted back-to-back)
+                    ← yield, do NOT plan / think / write anything else
+  Single Observation turn: receives all N results at once
+  ```
+  In one assistant turn, emit one `task()` tool call per chapter, back-to-back, with NO intervening text, NO `thought`-style narration, NO partial writes — just the task calls. Then yield control. The runtime fans them out concurrently and returns all Observations together when they complete.
+
+  With a sub-agent concurrency of 5 and 8 chapters: ~2 batches of ~4 minutes each → ~8 minutes total instead of 32. **Wall time scales by `1 / concurrency`**.
+
+  **Self-check before emitting `task()`:**
+  Have you written the prompts for **every** chapter that needs investigation in this Phase 3 round? If not, finish drafting them first, THEN emit them all together. Never emit one and "see how it goes" — that is the sequential anti-pattern.
+
+  **Runtime concurrency mechanics.** Claude Code's `Task` tool dispatches sub-agents in parallel up to its own pool. Other runtimes integrating the same skill should configure their own sub-agent pool similarly so the batch actually runs in parallel rather than being serialised at the executor level.
+
+- **Prompt cache is NOT shared**: each sub-agent has an isolated LLM context, so token usage is 5–10× the main agent.
+- **The sub-agent writes the chapter draft directly via the Write tool** (saved as a file, NOT returned in the task result text). The main agent reads the return value and appends detail questions into `questions.json`.
+- **One `task()` per chapter**. Bundling all chapters into a single `task` call defeats the purpose (the isolated context per chapter disappears).
+
+**When the `task` tool is unavailable**, the main agent performs STEP A-F itself per chapter.
 
 ---
 
-### Outline-mode chapter writing (when `depth_mode == "outline" | "interactive"`)
+### 🆕 outline-mode chapter writing (when `depth_mode == "outline" | "interactive"`)
 
 This section does NOT apply in `comprehensive` mode. In outline mode, Phase 3's behaviour is replaced by OUT-A through OUT-D below.
 
@@ -580,6 +766,7 @@ In outline mode:
 - **In `outline` / `interactive` mode**: "exhaustive entity listing" takes precedence. Apply Confidence labels honestly per cell — do NOT over-apply 🟢 (only for files actually viewed).
 - Cross-chapter consistency is checked in Phase 4.
 - Do not hide uncertainty markers; keep them explicit in the draft. They are the starting point for Phase 5 dialogue.
+- **Phase 3 progression gate (mandatory)**: do NOT declare Phase 3 complete unless **every** chapter in `wbs.json.chapters[]` (standard, reserved, AND user_custom) has a non-empty body in `drafts/` (at least 10 non-blank lines outside of code fences). The agent MUST verify this before updating `state.json` to mark Phase 3 complete; declaring "complete" while chapters are still stubs is a contract violation and triggers an immediate Phase 4 fail.
 
 ---
 
@@ -596,28 +783,35 @@ Run inventory cross-check, per-chapter quality metrics, MECE check, and consiste
    ```
    This resolves every `[REF: path:line]` in `drafts/*.md` to a SRC unit and produces the MECE aggregation.
 
-2. **Run coverage-check.py**
+2. **Run coverage-check.py (mandatory; exit code is binding)**
    ```bash
    python .cc-rsg/skill/scripts/coverage-check.py \
      --cc-rsg-dir .cc-rsg \
      --target-dir-for-required drafts \
      --output-format text
    ```
-   Checks all of the following at once:
+   This invocation is **non-optional**. The script's exit code is the gate:
+   - `0` → all checks pass; Phase 4 may proceed.
+   - `1` → at least one check failed; go to step 3 (loopback). Recording `all_quality_gates_passed: true` in `state.json` while exit is 1 is forbidden.
+   - `2` → required artefacts (e.g. `inventory.json`) missing; surface to user.
+
+   Checks performed (12 total):
    - inventory count (min: `max(50, files / 20)`)
    - macro-type INV ratio (max 20%)
    - covered_by fill rate (90%)
-   - per-chapter body lines (≥ 200), `[REF:]` count (≥ 10), code blocks (≥ 3), Mermaid (≥ 1), Sources Read items (≥ 5)
+   - per-chapter body lines (≥ 200), `[REF:]` count (≥ 10), code blocks (≥ 3), Mermaid (≥ 1), Sources Read items (≥ 5) — **applied only to `kind: "standard"` chapters; `user_custom` chapters are exempt**
    - questions count (≥ 10), open ratio (≤ 20%)
    - MECE coverage (≥ 70%)
+   - **Check 12 — User-custom deliverables**: every filename in `goal.json.user_custom_deliverables` must exist in the target directory (`drafts/` in Phase 4, `final/` in Phase 6) AND have a non-empty body (≥ 10 non-blank lines outside code fences).
 
 3. **Failure → loop back to Phase 3**
-   - When `exit code` is 1, read the "gate decision" section of the output and:
+   - When exit code is 1, read the "gate decision" section of the output and:
      1. Identify the failed chapter (e.g. `chapter 05-data-model.md: [REF:] count is 7 < required 10`)
      2. **Read additional sources** corresponding to the chapter's `assigned_inventory_ids`
      3. Add to Sources Read, raise `[REF:]` count, thicken the body
      4. Re-run coverage-check.py
-   - Maximum iterations: **3**. If a chapter still fails after 3 attempts, record it in `99-unresolved.md` as "insufficient quality" and continue.
+   - For `user_custom` chapters that are missing or empty, treat the failure the same way: return to Phase 3 and fill the chapter using `wbs.json.chapters[].source_intent` and any Phase 5 dialogue answers that pertain to it.
+   - Maximum iterations: **3**. If a `kind: "standard"` chapter still fails after 3 attempts, record it in `99-unresolved.md` as "insufficient quality" and continue. A failing `kind: "user_custom"` chapter must NOT be silently demoted to `99-unresolved.md`; instead, prompt the user via `AskUserQuestion` to (a) keep retrying, (b) reduce scope, or (c) abandon the deliverable explicitly.
 
 4. **Cross-reference verification**
    - Check whether any cross-chapter inconsistency exists for the same concept.
@@ -635,9 +829,10 @@ Run inventory cross-check, per-chapter quality metrics, MECE check, and consiste
    - Once every chapter passes (or hits the 3-attempt qualitative limit), update `state.json` and proceed to Phase 5.
 
 ### Phase-specific cautions
-- **Do not proceed to Phase 5 until coverage-check.py PASSes** (up to 3 loop iterations).
+- **Do not proceed to Phase 5 until coverage-check.py PASSes** (up to 3 loop iterations). Setting `phase_4.all_quality_gates_passed: true` is only allowed when the most recent `coverage-check.py` invocation returned exit code 0.
 - The loopback is not "padding the prose" — its purpose is to **read more real code, add more citations, and thicken the explanation**.
 - Missing cross-chapter inconsistencies makes Phase 5 dialogue explode. Squash them in Phase 4.
+- **`coverage_rate` < 100% with `all_quality_gates_passed: true` is a contradiction** and is never permitted. If full coverage is impossible within 3 iterations, leave `all_quality_gates_passed: false`, record the unfinished chapters, and surface to the user instead of advancing.
 
 ---
 
@@ -712,6 +907,11 @@ Reflect the answer into the corresponding entry in `questions.json`:
 
 - Reflect each answer into the corresponding chapter draft (remove or update uncertainty markers).
 - Fill in `[BLOCKED: see Q-NNN]` sections.
+- **Answers that define a new deliverable structure are actions, not notes.** If a dialogue answer fixes the contents/sections of a `kind: "user_custom"` chapter that is still empty (or fixes a new file the user introduced in Phase 5), the agent MUST:
+  1. Update the corresponding `wbs.json.chapters[]` entry — set or refine `chapter_title`, `assigned_inventory_ids`, and append the answer text to `source_intent`.
+  2. Push the chapter back to Phase 3 (re-open with `status: "pending"`) and run a `chapter-investigator` pass (or the in-line equivalent) to actually write the file.
+  3. Re-run `coverage-check.py` after Phase 3 finishes. Only when the file exists with body content may the chapter be marked `status: "done"`.
+- Recording the user's answer in `99-unresolved.md` or in `state.json.phase_5.user_feedback` **without** triggering chapter creation is a contract violation: the user asked for a deliverable, not for a note about a deliverable.
 
 ### Re-reconnaissance (only when needed)
 
@@ -724,10 +924,27 @@ Satisfy `coverage-check.py`'s `--max-open-ratio 0.2` criterion:
 - Strictly less than 20% remain `open`
 - Continue Phase 5 until this is reached.
 
+### Phase 5 skip prevention (mandatory)
+
+Phase 5 dialogue must actually happen. Recording `phase_5.status: "complete"` while:
+- `questions.json` contains ≥ 20% of questions with `status: "open"`, OR
+- Zero `AskUserQuestion` calls have been emitted in Phase 5, OR
+- No question entry in `questions.json` has a populated `answer` field
+
+— is a contract violation. Each of these states is an automatic Phase 5 fail; the agent must restart the 3-stage dialogue, not advance to Phase 6.
+
+Concretely, before declaring Phase 5 complete the agent MUST:
+1. Count `open` vs total questions. If `open / total > 0.2`, continue dialogue.
+2. Verify at least the **Stage 1 overview** AND the **Stage 2 critical clusters** dialogues were actually presented to the user via `AskUserQuestion` (Stage 3 individual questions for the residual). Internal notes or `state.json.phase_5.user_feedback` strings do NOT substitute for actual dialogue.
+3. Record per-question `answered_by` (user vs. agent inference) and `answered_at` (real UTC timestamp). Bulk-marking 50 questions as "answered" without dialogue is a contract violation.
+
+The Phase 6 intent-vs-delivery audit re-verifies these constraints; failure routes back to Phase 5.
+
 ### Phase-specific cautions
 - Skipping Stage 1 / Stage 2 and doing only Stage 3 is forbidden (the user loses the big picture).
 - Demanding SME-grade answers for every question breaks the dialogue. `nice-to-have` items are allowed to remain as inferences.
 - `abandoned` is reserved for "truly unanswerable in the long term" cases — do not abuse it as a shortcut.
+- **Bulk marking dozens of questions as `answered` without dialogue is a contract breach** — the user did not answer them; the agent silently dropped them. The correct action is either to actually run the dialogue, or to honestly mark them `abandoned` with a reason.
 
 ---
 
@@ -741,8 +958,9 @@ Output the final spec as Markdown under `.cc-rsg/final/`.
 File names follow the ASCII slug convention finalised in Phase 2 (`^(0\d|[1-9]\d)-[a-z0-9-]+\.md$`; reserved files: `00-metadata.md` / `99-unresolved.md` / `traceability.md`). Phase 6 does not create new names; it fills in the skeleton files generated in Phase 2.
 
 1. **Merge chapter drafts**
-   - Copy each chapter from `drafts/` to `.cc-rsg/final/` in the template-defined order.
-   - Do NOT change the file names (use the ASCII slug names finalised in Phase 2).
+   - Copy every chapter in `wbs.json.chapters[]` — standard, reserved, AND user_custom — from `drafts/` to `.cc-rsg/final/` in the template-defined order (user-custom chapters typically appear at the end unless the user's intent suggests otherwise).
+   - Do NOT change the file names (use the names finalised in Phase 2).
+   - Do NOT silently skip a chapter just because its draft body is short — that is a Phase 3 / Phase 4 failure and must be surfaced, not papered over.
    - Strip the meta comment at the top of each chapter file.
 
 2. **Generate the traceability table (fill in `traceability.md`)**
@@ -775,23 +993,41 @@ File names follow the ASCII slug convention finalised in Phase 2 (`^(0\d|[1-9]\d
    ├── 03-...each chapter...md
    ├── 99-unresolved.md     # Unresolved items (created Phase 2, filled Phase 6)
    ├── traceability.md      # Traceability table (created Phase 2, filled Phase 6)
+   ├── manual.md            # Example: a user-custom deliverable declared in goal.json
    └── README.md            # Reader's guide for the deliverable (generated in Phase 6)
    ```
-   Note: file names are ASCII slug-fixed (language-independent). Chapter titles in the body follow `goal.json.output_language` (EN example: `# Chapter 1: Overview` / JA example: `# 第1章: 概要`).
+   Note: standard / reserved file names are ASCII slug-fixed (language-independent); user-custom file names match the verbatim entries in `goal.json.user_custom_deliverables`. Chapter titles in the body follow `goal.json.output_language` (EN example: `# Chapter 1: Overview` / JA example: `# 第1章: 概要`).
 
-6. **Completion notification**
-   - Report to the user the deliverable location, the total page (or section) count, number of resolved questions, and number of unresolved items.
-   - Mark `state.json` as complete.
+6. **Intent-vs-delivery audit (mandatory; the final gate before completion)**
+   - Re-run `coverage-check.py` against `--target-dir-for-required final`. Exit code must be 0.
+   - Verify that every filename listed in `goal.json.user_custom_deliverables` exists at `.cc-rsg/final/{name}` AND has a non-empty body (≥ 10 non-blank lines outside code fences). Demoting any of these to `99-unresolved.md` or recording them as "for next time" in `state.json` is forbidden.
+   - Verify that the three reserved files (`00-metadata.md`, `99-unresolved.md`, `traceability.md`) all exist under `final/`.
+   - **Verify state.json invariants**:
+     - `current_phase` must equal `6` (and only `6`) when Phase 6 completes. Earlier values such as `2` while `phase_6.status: "complete"` are inconsistent and indicate the agent advanced phases out of order — fail Phase 6 in that case.
+     - For every `i` from 0 to 6, if `phase_i.status == "complete"`, then `phase_j.status` for `j < i` MUST also be `"complete"`. No skipping allowed.
+     - `session_history[]` array MUST be present and non-empty. Missing or empty `session_history` indicates the agent never recorded any phase transition and is a contract violation.
+     - The Phase 5 skip-prevention conditions (see Phase 5 "skip prevention" section) must hold: `questions.json` open-ratio ≤ 20%, ≥ 1 `AskUserQuestion` emitted in Phase 5, ≥ 1 question with populated `answer` field.
+   - If ANY check fails: do NOT mark Phase 6 complete. Instead, reopen the offending chapter(s) (`wbs.json.chapters[].status = "pending"`), return to Phase 3 or Phase 5 as appropriate, and loop. Repeat until every check passes.
+   - If after additional Phase 3/4 iterations the agent still cannot deliver a `user_custom` chapter (e.g. the source code does not support it), use `AskUserQuestion` to obtain explicit user permission to drop the deliverable; only an explicit user opt-out justifies skipping the file. Record the decision in `state.json.phase_6.user_opt_outs[]` with the reason.
+
+7. **Timestamps in `state.json`**
+   - Every entry in `state.json.session_history[]` and every `last_updated` / `completed_at` / `timestamp` field MUST use a real UTC timestamp captured at write time (e.g. `date -u +%FT%TZ`). Using a placeholder like `2026-01-01T00:00:00Z` for every event is forbidden — it makes post-mortem analysis impossible.
+   - **Detector for placeholder timestamps**: if every `session_history` entry shares the same suspiciously round timestamp (`T00:00:00Z`, `T12:00:00Z`, or evenly-spaced 10-minute intervals like `T12:00:00Z`, `T12:10:00Z`, …), that is almost certainly synthetic. Regenerate `session_history` with real capture-time values, even retroactively if the original timing was not recorded — note that the timestamps are approximations and explain why in `00-metadata.md`. Never silently keep synthetic timestamps.
+
+8. **Completion notification**
+   - Report to the user the deliverable location, the total page (or section) count, number of resolved questions, number of unresolved items, AND the list of `user_custom_deliverables` that were delivered.
+   - Mark `state.json` as complete only after step 6 passes.
 
 ### Phase-specific cautions
 - The "unresolved items" chapter (`99-unresolved.md`) must NOT be omitted. It is the root of the spec's credibility.
 - Omitting the metadata chapter (`00-metadata.md`) loses "when, from which version of the code" the spec was generated.
 - Omitting the traceability table (`traceability.md`) makes every statement's origin untraceable.
-- The presence of the three required files (`00-metadata.md` / `99-unresolved.md` / `traceability.md`) is verified by `scripts/coverage-check.py`; missing files raise errors.
+- The presence of the three required files (`00-metadata.md` / `99-unresolved.md` / `traceability.md`) AND every file in `goal.json.user_custom_deliverables` is verified by `scripts/coverage-check.py`; missing files raise errors.
+- **Pushing a user-promised deliverable into "future improvements" of `99-unresolved.md` is a contract breach**, not a graceful degradation. The user did not ask for a recommendation that the file be made; they asked for the file. If the file cannot be made, ask the user, do not invent a workaround.
 
 ---
 
-## Phase 6.5: Deep-dive acceptance mode (when `depth_mode` is `outline` or `interactive`)
+## 🆕 Phase 6.5: Deep-dive acceptance mode (when `depth_mode` is `outline` or `interactive`)
 
 ### Purpose
 
@@ -1163,10 +1399,19 @@ For long-running analysis sessions, record progress / established facts / unreso
 
 ## Versioning and changelog
 
-- v0.4.1 (2026-06-11): OSS neutrality patch. Remove runtime-specific terminology that leaked in from an internal staging fork so the skill reads correctly when consumed standalone in Claude Code (or any host runtime). `file_editor view` references throughout Phase 3 / Phase 5 and `references/outline-tables.md` are replaced with neutral "read with the Read tool" language. The Phase 3 sub-agent "important constraints" block drops references to a specific runtime SDK / `threading.Lock` / specific LLM-subscription tiers; the spec now describes constraints in runtime-agnostic terms. Phase 0 Step 3's harness-hint paragraph generalises "userUiLanguage hint from the parent harness" to "UI-language hint from the host runtime". The lingering "pre-v2 behaviour" generation label is replaced with "fallback". No functional behaviour change; this is documentation/wording only.
-- v0.4.0 (2026-06-09): English-base migration. The entire skill bundle — SKILL.md, agents/, templates/, references/, and the docstrings/messages of scripts/ — is now English-base. When `output_language == "ja"`, the agent dynamically renders deliverable text (chapter body, AskUserQuestion bodies, progress messages, etc.) in Japanese while preserving every machine-readable element (REF markers, JSON keys, file slugs, ID prefixes, the literal `## Sources Read` heading) verbatim. Principle #11 default flips from `"ja"` to `"en"`. README structure flipped to English-first with a Japanese-version section below. No new functional changes; this release is a language-base transition.
-- v0.3.0 (2026-06-08): Depth modes (`comprehensive` / `outline` / `interactive`) introduced for large codebases. Phase 1 end prompts the user to select the mode based on file count; Phase 2/3/4/6 branch accordingly. `outline` mode generates Layer 1 chapters (Modules / Entities / Actions / Data / Dependencies overview tables) and Layer 2 (Mermaid diagrams) with a "deep-dive candidates" list at the end of each chapter. `interactive` mode adds **Phase 6.5: Deep-dive acceptance mode** where `chapter-investigator` is invoked on-demand to author a comprehensive-quality partial chapter. Confidence labels (🟢 VERIFIED / 🟡 INFERRED / 🔴 ASSUMED) become mandatory per table cell. New `references/outline-tables.md` (341 lines covering 6 stacks — Ruby/Rails, Python/Django, JS/TS/React, Go, Java/Kotlin Spring Boot — with ripgrep enumeration patterns, Mermaid templates, and deep-dive selection rules). `coverage-check.py` extended with outline-mode validations.
-- v0.2.0 (2026-06-06): Battle-hardened revision from a 1095-file Ruby on Rails codebase pilot. Phase 3 restructured around STEP A-G (Sources Read → quote extraction → body authoring → uncertainty markers → detail questions → critical handling → per-chapter sub-agent delegation). Phase 4 gains explicit loopback with 11 quantitative validations. Phase 5 makes the 3-stage dialogue mandatory with anti-padding rules. inventory-units.md gains granularity rules and a 14-unit Ruby on Rails catalog. Output language selection gains a default policy (`"ja"` at the time). New scripts: source-map.py, build-trace.py, build-traceability.py. coverage-check.py expanded to 11-item verification. New agent definition: agents/chapter-investigator.md.
+- v0.5.0 (2026-06-15): intent-vs-delivery enforcement + post-pilot quality hardening.
+  - **Mermaid styling contract**: every Mermaid diagram in `drafts/` / `final/` is structure-only (no per-node fill, no hex colours, no `style ... fill:`). The rendering host supplies a theme-aware palette so dark/light/auto themes look consistent.
+  - **`user_custom_deliverables` enforcement**: Phase 0 extracts `*.md` filename mentions from `free_text_notes` and persists them as `goal.json.user_custom_deliverables`. Phase 2 adds those files to `wbs.json.chapters[]` with `kind: "user_custom"` under a relaxed naming regex. Phase 6 audits that every one of them exists in `final/` with a non-empty body (≥ 10 lines outside code fences). `coverage-check.py` check 12 enforces this.
+  - **Strict `[REF: path:line]` / `[REF: path:start-end]` format**: forbidden variants (`(lines X-Y)`, `<!-- file lines a-b -->`, `[REF: ... L1-L138]`, `[REF: file, lines 1-138]`, `[REF: file]` with no lines, etc.) enumerated explicitly so downstream parsers can rely on the shape.
+  - **Phase 5 skip prevention**: refusing `complete` when `status: open` ratio ≥ 20%, no `AskUserQuestion` call was made, or zero `answer` fields are populated.
+  - **Phase 3 progression gate**: every chapter in `wbs.json.chapters[]` (standard, reserved, AND user_custom) must have a non-empty body (≥ 10 non-blank lines) before Phase 3 can be marked complete.
+  - **Question-text quality contract**: no `\uXXXX` JSON escapes in AskUserQuestion text, kanji confusion-pair self-check (`妥/妊`, `暑/署`, `復/複`, ...).
+  - **Optional `variants/B/`** for Context Optimization mode B (per-chapter Task delegation with manifest relay) — opt-in via `goal.json.context_optimization_mode = "B"`.
+  - **`coverage-check.py`** dynamic NAMING_EXEMPT to exempt user-custom file names from the chapter-naming regex.
+- v0.4.1 (2026-06-11): minor consistency pass — neutralised runtime-specific phrasing in SKILL.md and outline-tables.md.
+- v0.4.0 (2026-06-09): English-base migration of the entire skill bundle (SKILL.md, `agents/`, `variants/`, `templates/`, `references/`, `scripts/`). `goal.json.output_language` defaults to `"en"`; Phase 0 Step 3 prompts the user bilingually.
+- v0.3.0 (2026-06-08): Depth modes (`comprehensive` / `outline` / `interactive`). Outline mode generates Layer 1 + Layer 2 overview chapters with confidence labels (🟢 / 🟡 / 🔴). New `references/outline-tables.md` covering 6 stacks.
+- v0.2.0 (2026-06-06): per-chapter sub-agent delegation, Phase 4 loopback verification, granularity rules, Rails catalog in `references/inventory-units.md`, output-language selection.
 - v0.1.0 (2026-05-01): initial draft. Defines the Phase 0-6 state machine, Question Bank, sub-agent behaviour, and file layout.
 
 ---

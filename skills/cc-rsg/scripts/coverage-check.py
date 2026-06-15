@@ -21,10 +21,17 @@ Checks performed:
 9.  Upper bound on the `status: open` ratio after Phase 5 (`--max-open-ratio`)
 10. inventory.covered_by fill rate (`--min-covered-by-fill`)
 11. MECE check (consults `.cc-rsg/trace.json`, `--min-mece-coverage`)
+12. **User-custom deliverables**: every filename in
+    `goal.json.user_custom_deliverables` must exist in the target directory
+    AND have a non-empty body (>= 10 non-blank lines outside code fences).
+    These files are exempt from checks 1-5 (the per-chapter comprehensive
+    quality gates) because their quality bar is the user's intent expressed
+    in `free_text_notes`, not the source-code-spec-chapter gates. Only
+    existence + body presence is enforced.
 
 `--fail-on-uncovered` `--strict` `--output-format` remain for backward
-compatibility. Every quality check returns exit 1 on failure. All
-thresholds are overridable via CLI flags.
+compatibility. Every quality check returns exit 1 on failure. All thresholds
+are overridable via CLI flags.
 
 Usage:
     python coverage-check.py \\
@@ -64,6 +71,7 @@ from typing import Any
 # ----------------------------------------------------------------------------
 
 NAMING_PATTERN = re.compile(r"^(0\d|[1-9]\d)-[a-z0-9-]+\.md$")
+USER_CUSTOM_NAMING_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*\.md$")
 NAMING_EXEMPT = {"traceability.md", "README.md"}
 REQUIRED_FILES = ("00-metadata.md", "99-unresolved.md", "traceability.md")
 
@@ -138,6 +146,9 @@ class CoverageReport:
     confidence_verified: int = 0
     confidence_inferred: int = 0
     confidence_assumed: int = 0
+    # user-custom deliverables (intent-vs-delivery audit, check 12)
+    user_custom_expected: list[str] = field(default_factory=list)
+    user_custom_failures: list[str] = field(default_factory=list)
 
 
 # ----------------------------------------------------------------------------
@@ -191,6 +202,33 @@ def load_trace(cc_rsg_dir: Path) -> dict[str, Any] | None:
     if not t.exists():
         return None
     return json.loads(t.read_text(encoding="utf-8"))
+
+
+def load_user_custom_deliverables(cc_rsg_dir: Path) -> list[str]:
+    """Read `goal.json.user_custom_deliverables` if present; return [] otherwise.
+
+    These are extra filenames the user explicitly requested in `free_text_notes`
+    during Phase 0. They are exempt from the standard chapter-naming regex and
+    must exist in the target directory at Phase 6 (intent-vs-delivery audit).
+    Per-chapter comprehensive quality gates (200 lines / 10 REFs / Mermaid /
+    Sources Read) are NOT applied to these files; only existence + non-empty
+    body (check 12) is enforced.
+    """
+    g = cc_rsg_dir / "goal.json"
+    if not g.exists():
+        return []
+    try:
+        data = json.loads(g.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    raw = data.get("user_custom_deliverables", [])
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        if isinstance(item, str) and USER_CUSTOM_NAMING_PATTERN.match(item):
+            out.append(item)
+    return out
 
 
 def scan_chapter_files(target_dir: Path) -> dict[str, str]:
@@ -363,18 +401,71 @@ def check_question_integrity(
     return issues, sorted(set(blocked_referenced))
 
 
-def check_naming_convention(drafts_dir: Path) -> list[str]:
+def check_naming_convention(drafts_dir: Path, user_custom: list[str] | None = None) -> list[str]:
+    """Flag files that violate the chapter-naming regex.
+
+    `user_custom` extends `NAMING_EXEMPT` dynamically; entries listed in
+    `goal.json.user_custom_deliverables` are NOT counted as naming violations.
+    """
     if not drafts_dir.exists() or not drafts_dir.is_dir():
         return []
+    allowed_exempt = set(NAMING_EXEMPT) | set(user_custom or [])
     warnings: list[str] = []
     for f in sorted(drafts_dir.glob("*.md")):
-        if f.name in NAMING_EXEMPT:
+        if f.name in allowed_exempt:
             continue
         if not NAMING_PATTERN.match(f.name):
             warnings.append(
-                f"{f.name} violates the naming convention ({NAMING_PATTERN.pattern}) and is not in the reserved list {sorted(NAMING_EXEMPT)}"
+                f"{f.name} violates the naming convention ({NAMING_PATTERN.pattern}) and is not in the reserved list {sorted(NAMING_EXEMPT)} or the user_custom_deliverables list"
             )
     return warnings
+
+
+def check_user_custom_deliverables(target_dir: Path, user_custom: list[str], min_body_lines: int = 10) -> list[str]:
+    """Verify every user-custom deliverable exists in the target dir with a non-empty body.
+
+    "Non-empty body" means at least `min_body_lines` non-blank lines outside
+    of code fences. This catches the case where the agent stubs the file but
+    never fills it.
+
+    Per-chapter comprehensive quality gates (200 lines, REFs, Mermaid, etc.)
+    do NOT apply to user_custom files — those are handled by the caller via
+    explicit exclusion from `evaluate_chapter_gates`. Only existence + body
+    presence is enforced here (check 12).
+    """
+    failures: list[str] = []
+    if not user_custom:
+        return failures
+    if not target_dir.exists():
+        return [f"target directory {target_dir} does not exist (cannot verify user-custom deliverables)"]
+    for name in user_custom:
+        p = target_dir / name
+        if not p.exists():
+            failures.append(f"user-custom deliverable {name} is missing from {target_dir}")
+            continue
+        try:
+            content = p.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = p.read_text(encoding="utf-8", errors="replace")
+        in_code = False
+        body_lines = 0
+        for line in content.splitlines():
+            if CODE_FENCE_RE.match(line):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("<!--") or stripped.startswith("-->"):
+                continue
+            body_lines += 1
+        if body_lines < min_body_lines:
+            failures.append(
+                f"user-custom deliverable {name} exists but body has only {body_lines} non-blank lines (need >= {min_body_lines})"
+            )
+    return failures
 
 
 def check_required_files(target_dir: Path) -> list[str]:
@@ -438,7 +529,7 @@ def build_report(
 
     depth_mode = detect_depth_mode(cc_rsg_dir)
 
-    # v1 compatibility: mention detection
+    # backward compatibility: mention detection
     uncovered: list[InventoryItem] = []
     for item in inventory:
         # Use any existing covered_by values (set by the agent if filled manually).
@@ -451,13 +542,23 @@ def build_report(
         questions, inventory_ids, chapters
     )
 
-    naming_warnings = check_naming_convention(target_dir)
+    user_custom = load_user_custom_deliverables(cc_rsg_dir)
+    naming_warnings = check_naming_convention(target_dir, user_custom=user_custom)
     missing_required = check_required_files(target_dir)
+    user_custom_failures = check_user_custom_deliverables(target_dir, user_custom)
 
     # Chapter metrics
     chapter_metrics: list[ChapterMetrics] = []
     for name, content in chapters.items():
         chapter_metrics.append(compute_chapter_metrics(name, content))
+
+    # user_custom chapters are evaluated only by check 12 (existence + non-empty body).
+    # The comprehensive per-chapter gates (200 lines / 10 REFs / code blocks / Mermaid /
+    # Sources Read) are designed for source-derived spec chapters, not for user-narrated
+    # files like manual.md. Split chapter_metrics into "standard" and "user_custom" so
+    # only the standard ones receive evaluate_chapter_gates.
+    user_custom_set = set(user_custom)
+    standard_chapter_metrics = [m for m in chapter_metrics if m.file not in user_custom_set]
 
     # In outline / interactive mode the comprehensive-mode chapter gates
     # (200 lines / 10 REFs / code blocks / Mermaid / 5 Sources Read) are
@@ -465,7 +566,7 @@ def build_report(
     # some row of some table" — reuse the uncovered logic below.
     if depth_mode == "comprehensive":
         evaluate_chapter_gates(
-            chapter_metrics,
+            standard_chapter_metrics,
             min_refs=min_refs_per_chapter,
             min_lines=min_lines_per_chapter,
             min_code_blocks=min_code_blocks_per_chapter,
@@ -543,10 +644,16 @@ def build_report(
         )
 
     # Reflect per-chapter metric failures into the overall gate failures.
+    # (user_custom chapters were excluded from evaluate_chapter_gates above; their
+    # m.failures is empty even if 200-line / 10-REF gates would have failed.)
     for m in chapter_metrics:
         if m.failures:
             for f in m.failures:
                 gate_failures.append(f"chapter {m.file}: {f}")
+
+    # Reflect user-custom deliverable failures (Phase 6 intent-vs-delivery gate, check 12).
+    for f in user_custom_failures:
+        gate_failures.append(f"user_custom: {f}")
 
     # Aggregate confidence labels for outline / interactive mode.
     # Count how many times 🟢 VERIFIED / 🟡 INFERRED / 🔴 ASSUMED appear in chapter bodies.
@@ -599,6 +706,8 @@ def build_report(
         confidence_verified=verified,
         confidence_inferred=inferred,
         confidence_assumed=assumed,
+        user_custom_expected=user_custom,
+        user_custom_failures=user_custom_failures,
     )
 
 
@@ -608,7 +717,7 @@ def build_report(
 
 def render_text(report: CoverageReport) -> str:
     lines: list[str] = []
-    lines.append("=== cc-rsg Phase 4 verification report ===")
+    lines.append("=== cc-rsg Phase 4 verification report (v2) ===")
     lines.append("")
     lines.append(f"[Depth mode] {report.depth_mode}")
     if report.depth_mode != "comprehensive":
@@ -658,6 +767,12 @@ def render_text(report: CoverageReport) -> str:
         )
         for f in m.failures:
             lines.append(f"      - {f}")
+    if report.user_custom_expected:
+        lines.append("")
+        lines.append(f"[User-custom deliverables expected from goal.json: {len(report.user_custom_expected)}]")
+        for name in report.user_custom_expected:
+            flag = "✅" if not any(name in f for f in report.user_custom_failures) else "❌"
+            lines.append(f"  {flag} {name}")
     lines.append("")
     lines.append("[Gate decision]")
     if not report.gate_failures and not report.missing_required:
@@ -707,6 +822,8 @@ def render_json(report: CoverageReport) -> str:
         "mece_excluded": report.mece_excluded,
         "mece_uncovered": report.mece_uncovered,
         "mece_coverage_rate": report.mece_coverage_rate,
+        "user_custom_expected": report.user_custom_expected,
+        "user_custom_failures": report.user_custom_failures,
         "gate_failures": report.gate_failures,
     }, ensure_ascii=False, indent=2)
 
@@ -716,7 +833,7 @@ def render_json(report: CoverageReport) -> str:
 # ----------------------------------------------------------------------------
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="cc-rsg Phase 4 verification")
+    p = argparse.ArgumentParser(description="cc-rsg Phase 4 verification (v2)")
     p.add_argument("--cc-rsg-dir", type=Path, default=Path.cwd() / ".cc-rsg")
     p.add_argument("--target-dir-for-required", default="final", choices=["drafts", "final"])
     p.add_argument("--output-format", choices=["text", "json"], default="text")
@@ -737,7 +854,7 @@ def main() -> int:
     p.add_argument("--min-covered-by-fill", type=float, default=0.9)
     p.add_argument("--min-mece-coverage", type=float, default=0.7)
 
-    # v1 compatibility
+    # backward compatibility
     p.add_argument("--fail-on-uncovered", action="store_true")
     p.add_argument("--strict", action="store_true")
 
