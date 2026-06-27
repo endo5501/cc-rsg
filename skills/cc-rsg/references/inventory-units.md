@@ -2,7 +2,7 @@
 
 A catalogue of typical inventory units per language/framework, used during inventory extraction in Phase 2.
 
-This document is the reference Claude consults to decide "what to enumerate exhaustively" from the target codebase. It becomes the basis for the "everything covered" check in Phase 4 inventory-based verification.
+This document tells the agent what to enumerate exhaustively from the target codebase. It becomes the basis for the "everything covered" check in Phase 4 inventory-based verification.
 
 <!--
 Extension guide:
@@ -27,7 +27,7 @@ Extension guide:
 - [SQL / database schema](#sql--database-schema)
 - [When language choice is ambiguous](#when-language-choice-is-ambiguous)
 - [Customisation and extension](#customisation-and-extension)
-- [Instruction summary for Claude during extraction](#instruction-summary-for-claude-during-extraction)
+- [Instruction summary for the agent during extraction](#instruction-summary-for-the-agent-during-extraction)
 
 ---
 
@@ -508,7 +508,7 @@ A future version may split this into `references/inventory-units-{custom}.md`-st
 
 ---
 
-## Instruction summary for Claude during extraction
+## Instruction summary for the agent during extraction
 
 1. **First, run `scripts/source-map.py --target <root>`**. This auto-extracts file-level source units (SRC-NNNN) and saves them to `.cc-rsg/source-map.json`.
 2. Identify the target codebase's primary language(s) from `recon-report.md`.

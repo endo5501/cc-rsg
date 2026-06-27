@@ -103,7 +103,7 @@ Items automated by `scripts/coverage-check.py`:
 - Existence of cited file paths in traceability
 - Required-field check on the Question Bank
 
-Items left to human or Claude review:
+Items left to human or agent review:
 - Per-template mandatory items (semantic checks)
 - Cross-chapter consistency (semantic)
 - Terminology consistency
@@ -156,7 +156,7 @@ At the end of Phase 4, report to the user in the following format.
 
 ## Customising the checklist
 
-When the user wants to add their own checks, create `.cc-rsg/custom-checklists.md` and append items there. In Phase 4, Claude runs the custom checks in addition to the standard ones.
+When the user wants to add their own checks, create `.cc-rsg/custom-checklists.md` and append items there. In Phase 4, the agent runs the custom checks in addition to the standard ones.
 
 Format custom checks like this:
 

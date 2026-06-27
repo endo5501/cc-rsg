@@ -81,7 +81,7 @@ Questions about the specifications of integration with external systems / APIs.
 - Why is only this field Base64-encoded — is that the external spec or a local choice?
 
 #### How to resolve
-- Consult the external system's official documentation (use WebFetch).
+- Consult the external system's official documentation when web access is available.
 - Ask the integration counterpart's owner.
 - Look at past integration-test logs.
 
@@ -153,7 +153,7 @@ Questions about security requirements, regulatory compliance, and conformance to
 
 ---
 
-## Category-selection logic (instructions to Claude)
+## Category-selection logic (instructions to the agent)
 
 When a sub-agent raises a question, use this flow to choose the category:
 
@@ -204,11 +204,11 @@ The initial release does not support adding custom categories through a UI. User
 
 2. Set the `category` field of relevant entries in `questions.json` to the new `id`.
 
-3. During Phase 5 dialogue, Claude treats custom categories on equal footing with the 7 standard categories.
+3. During Phase 5 dialogue, the agent treats custom categories on equal footing with the 7 standard categories.
 
 ### Future extensions
 
-- Interactive custom-category addition via AskUserQuestion
+- Interactive custom-category addition through the host interaction mechanism
 - Custom-category templates (a library of commonly used categories)
 
 ---
@@ -222,7 +222,7 @@ To reduce user burden in Phase 5, vary the dialogue strategy per category.
 | business_rule | Focused interview with SME (consecutive questions) |
 | architecture_decision | Consecutive questions if the original designer is available, otherwise inference + abandoned |
 | data_model_intent | Often answerable by sampling real data |
-| external_integration | Prefer external-doc lookup (WebFetch) |
+| external_integration | Prefer official external-documentation lookup when web access is available |
 | naming_history | Most are answered by Git blame |
 | operational_requirement | Group questions and interview infra / ops in one pass |
 | security_compliance | Formal inquiry to security; expect a delay |

@@ -118,9 +118,9 @@ The skill ships with the following 4 templates by default. The user may also bri
 
 ---
 
-## Decision tree (Claude's recommendation logic)
+## Decision tree (agent recommendation logic)
 
-Based on the Phase 1 reconnaissance, Claude follows this procedure to recommend a template:
+Based on the Phase 1 reconnaissance, the agent follows this procedure to recommend a template:
 
 ```
 1. Does the package manifest define main/module/bin?
@@ -166,17 +166,17 @@ Real projects often do not fit into a single template. Handle them as follows.
 1. Get the path to the template file.
 2. Parse the template and extract the chapter outline.
 3. Check whether each chapter has a meta-comment describing what it covers.
-   - When missing, Claude infers it from the chapter title and confirms with the user.
+   - When missing, the agent infers it from the chapter title and confirms with the user.
 4. Use the extracted outline for Phase 2 skeleton generation.
 
 ---
 
-## When the user adjusts Claude's recommendation
+## When the user adjusts the recommendation
 
 After the user accepts the recommendation, accept chapter additions, removals, or renames.
 
 ```
-Claude: "I recommend the Web application spec. The outline is:
+Agent: "I recommend the Web application spec. The outline is:
 - Overview
 - Architecture
 - Screen list
@@ -190,7 +190,7 @@ Any chapters to add, remove, or rename?"
 
 User: "Add a 'non-functional requirements' chapter. Place it before 'Operations settings'."
 
-Claude: "Got it. Finalising with:
+Agent: "Got it. Finalising with:
 - Overview
 - Architecture
 - Screen list
