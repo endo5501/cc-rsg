@@ -99,6 +99,12 @@ class SkillPortabilityTests(unittest.TestCase):
         for launcher in ("python3", "python", "py -3"):
             self.assertIn(launcher, adapters)
 
+    def test_readme_leads_with_skills_cli_installation(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        command = "npx skills add endo5501/cc-rsg"
+        self.assertIn(command, readme)
+        self.assertLess(readme.index(command), readme.index("cp -r"))
+
 
 if __name__ == "__main__":
     unittest.main()
