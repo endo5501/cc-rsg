@@ -114,14 +114,28 @@ DART_FN_KEYWORDS = {
 }
 # C/C++ type declarations: class / struct / union / enum / namespace, with an
 # optional `enum class` / `enum struct` form. Leading `typedef` / `template<...>`
-# / `export` qualifiers are tolerated. The trailing group keeps the inheritance
-# list / brace for the signature. Anonymous declarations (no name) are skipped.
+# / `export` qualifiers are tolerated. The remainder is captured as `tail` and
+# resolved by cpp_type_name(), which decides whether the line is a genuine type
+# *definition* (vs. a function returning the type, a variable, or a forward
+# declaration) and which identifier is the name.
 CPP_TYPE_RE = re.compile(
     r"^(\s*)(?:(?:typedef|template\s*<[^>]*>|export)\s+)*"
     r"(class|struct|union|enum|namespace)\b"
-    r"(?:\s+(?:class|struct))?"
-    r"\s+([A-Za-z_][A-Za-z0-9_]*)([^\n]*)"
+    r"(?:\s+(?:class|struct)\b)?"
+    r"(.*)$"
 )
+# Attribute / alignment noise that may sit between the keyword and the name,
+# e.g. `struct __attribute__((packed)) Foo`, `class __declspec(dllexport) Bar`,
+# `struct alignas(16) Baz`, `class [[deprecated]] Qux`.
+CPP_ATTR_STRIP_RE = re.compile(
+    r"^\s*(?:"
+    r"__attribute__\s*\(\(.*?\)\)"
+    r"|__declspec\s*\([^)]*\)"
+    r"|alignas\s*\([^)]*\)"
+    r"|\[\[.*?\]\]"
+    r")"
+)
+CPP_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # C/C++ top-level function definitions: return type (may carry `::`, `*`, `&`,
 # template args, etc.) + name + `(`, with no `;` after the paren so prototypes
 # and declarations are excluded. Out-of-line members (`void Foo::bar()`) match
@@ -173,25 +187,62 @@ def extract_py_block(lines: list[str], start_idx: int, indent: str) -> int:
 def extract_brace_block(lines: list[str], start_idx: int) -> int:
     """
     Brace-language block: starting at `start_idx`, count `{`/`}` and return the
-    1-indexed line number where the brace depth returns to zero. Used for Dart.
-    Falls back to the start line + 1 when no opening brace is found (e.g. a
-    single-line `=>` function or an abstract declaration ending in `;`).
+    1-indexed line number where the brace depth returns to zero. Used for Dart
+    and C/C++. Falls back to the start line + 1 when no opening brace is found
+    (e.g. a single-line `=>` function or an abstract declaration ending in `;`).
+
+    String literals, character literals, and `//` / `/* */` comments are
+    skipped so braces inside them (`"}"`, `'{'`, `// }`) do not miscount depth.
     """
     depth = 0
     seen_open = False
+    in_block_comment = False
     for j in range(start_idx, len(lines)):
-        for ch in lines[j]:
+        line = lines[j]
+        k = 0
+        n = len(line)
+        bodyless = False  # saw `;`/`=>` in real code before any brace opened
+        while k < n:
+            two = line[k:k + 2]
+            if in_block_comment:
+                if two == "*/":
+                    in_block_comment = False
+                    k += 2
+                    continue
+                k += 1
+                continue
+            if two == "/*":
+                in_block_comment = True
+                k += 2
+                continue
+            if two == "//":
+                break  # line comment: ignore the rest of the line
+            ch = line[k]
+            if ch == '"' or ch == "'":
+                quote = ch
+                k += 1
+                while k < n:
+                    if line[k] == "\\":
+                        k += 2
+                        continue
+                    if line[k] == quote:
+                        k += 1
+                        break
+                    k += 1
+                continue
             if ch == "{":
                 depth += 1
                 seen_open = True
             elif ch == "}":
                 depth -= 1
+            elif ch == ";" or two == "=>":
+                bodyless = True
+            k += 1
         if seen_open and depth <= 0:
             return j + 1  # 1-indexed
         # A bodyless declaration terminates at the first `;`/`=>` before any
-        # brace opens — e.g. `class C = A with B;` or `T f() => expr;`. This is
-        # valid on the start line itself (mixin-application classes).
-        if not seen_open and (";" in lines[j] or "=>" in lines[j]):
+        # brace opens — e.g. `class C = A with B;` or `T f() => expr;`.
+        if not seen_open and bodyless:
             return j + 1
     return len(lines)
 
@@ -330,28 +381,72 @@ def extract_dart_units(rel_path: str, source: str, id_factory) -> Iterable[Sourc
                     )
 
 
+def cpp_type_name(tail: str) -> str | None:
+    """
+    Given the text after a `class`/`struct`/`union`/`enum`/`namespace` keyword,
+    return the declared type name iff `tail` is a genuine type *definition* (the
+    body `{` may be on a later line). Return None when the line is actually a
+    function returning the type (`struct Node* make_node(...)`), a variable
+    declaration (`struct Config g = {`), a forward declaration (`struct Foo;`),
+    or an anonymous type (`struct {`).
+    """
+    rest = tail
+    # Drop attribute / alignment noise that can precede the name (may repeat).
+    while True:
+        m = CPP_ATTR_STRIP_RE.match(rest)
+        if not m or m.end() == 0:
+            break
+        rest = rest[m.end():]
+    # Declarator head: text up to the body `{`, statement `;`, base/underlying
+    # `:`, or template-argument `<`.
+    head = []
+    delimiter = ""
+    for ch in rest:
+        if ch in "{;:<":
+            delimiter = ch
+            break
+        head.append(ch)
+    head = "".join(head)
+    # A `(`, `=`, `*`, or `&` in the declarator means this is a function or an
+    # (initialised) variable, not a type definition.
+    if any(c in head for c in "(=*&"):
+        return None
+    idents = CPP_IDENT_RE.findall(head)
+    while idents and idents[-1] in ("final", "sealed"):
+        idents.pop()
+    if not idents:
+        return None  # anonymous type, or an export macro with no following name
+    # `struct Foo;` (forward) or `struct Foo bar;` (variable): a declaration that
+    # terminates with `;` and opens no body is not a definition.
+    if delimiter == ";":
+        return None
+    # The name is the last identifier before the delimiter, so leading export
+    # macros (`class API_EXPORT Foo`) resolve to `Foo`.
+    return idents[-1]
+
+
 def extract_cpp_units(rel_path: str, source: str, id_factory) -> Iterable[SourceUnit]:
     lines = source.splitlines()
     for i, line in enumerate(lines):
         m_type = CPP_TYPE_RE.match(line)
         if m_type:
-            indent, kw, name, rest = m_type.groups()
-            # Skip forward declarations / variable declarations: a line that ends
-            # with `;` and opens no brace (e.g. `class Foo;`, `struct Node* p;`).
-            if line.rstrip().endswith(";") and "{" not in line:
+            indent, kw, tail = m_type.groups()
+            name = cpp_type_name(tail or "")
+            if name is not None:
+                end_line = extract_brace_block(lines, i)
+                block_text = "\n".join(lines[i:end_line])
+                yield SourceUnit(
+                    id=id_factory(),
+                    path=rel_path,
+                    line_range=(i + 1, end_line),
+                    kind=f"cpp_{kw}",
+                    name=name,
+                    signature=line.strip()[:240],
+                    fingerprint=fingerprint(block_text),
+                )
                 continue
-            end_line = extract_brace_block(lines, i)
-            block_text = "\n".join(lines[i:end_line])
-            yield SourceUnit(
-                id=id_factory(),
-                path=rel_path,
-                line_range=(i + 1, end_line),
-                kind=f"cpp_{kw}",
-                name=name,
-                signature=f"{kw} {name}{rest}".strip()[:240],
-                fingerprint=fingerprint(block_text),
-            )
-            continue
+            # Not a type definition — fall through; it may be a function whose
+            # return type starts with one of these keywords (`struct Node* f()`).
         # Top-level function definitions only (column 0; skip control flow and
         # member functions written inside a class body, which are indented).
         if line and not line[0].isspace():
