@@ -115,6 +115,14 @@ class SourceMapDartTests(unittest.TestCase):
         self.assertLessEqual(start, end)
         self.assertGreaterEqual(end - start, 3)  # spans the class body
 
+    def test_unit_paths_use_forward_slashes(self) -> None:
+        # Paths must be POSIX-style so [REF:] markers and exclude globs match
+        # on Windows (build-trace.py matches forward-slash reference paths).
+        out = self._build({"features/home.dart": DART_SAMPLE})
+        for u in out["units"]:
+            self.assertNotIn("\\", u["path"], u)
+        self.assertTrue(any("/" in u["path"] for u in out["units"]))
+
 
 # ---------------------------------------------------------------------------
 # Item 2: Sources Read section must survive blank lines

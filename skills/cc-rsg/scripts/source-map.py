@@ -387,7 +387,7 @@ def iter_target_files(target: Path, exclude_globs: list[str]) -> Iterable[Path]:
         if not p.is_file():
             continue
         rel = p.relative_to(target.parent)
-        rel_str = str(rel)
+        rel_str = rel.as_posix()  # normalize separators for glob matching
         if matches_any(rel_str, exclude_globs):
             continue
         yield p
@@ -427,7 +427,9 @@ def build_source_map(
     base = target_path.parent
 
     for file_path in iter_target_files(target_path, exclude_globs):
-        rel_path = str(file_path.relative_to(base))
+        # POSIX-style (forward slash) so [REF:] markers, exclude globs, and
+        # path-suffix classification match consistently across platforms.
+        rel_path = file_path.relative_to(base).as_posix()
         strategies = classify_file(rel_path)
         if not strategies:
             files_excluded += 1
