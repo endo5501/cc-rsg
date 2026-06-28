@@ -289,6 +289,80 @@ class SourceMapCppTests(unittest.TestCase):
             self.assertNotIn("\\", u["path"], u)
         self.assertTrue(any("/" in u["path"] for u in out["units"]))
 
+    def test_function_returning_struct_is_a_function(self) -> None:
+        src = (
+            "struct Node* make_node(int v) {\n"
+            "  return 0;\n"
+            "}\n"
+            "\n"
+            "enum State next_state(int x) {\n"
+            "  return x;\n"
+            "}\n"
+        )
+        out = self._build({"f.c": src})
+        units = self._units(out)
+        # The functions must be captured under their real names as functions.
+        self.assertEqual(units["make_node"]["kind"], "cpp_function")
+        self.assertEqual(units["next_state"]["kind"], "cpp_function")
+        # The return types must NOT be misread as type definitions.
+        self.assertNotIn("Node", units)
+        self.assertNotIn("State", units)
+
+    def test_global_struct_variable_is_not_a_type_unit(self) -> None:
+        src = "struct Config g_cfg = {\n  1,\n};\n"
+        out = self._build({"g.c": src})
+        names = {u["name"] for u in out["units"]}
+        # A global of struct type is a variable, not a struct definition.
+        self.assertNotIn("Config", names)
+
+    def test_export_macro_does_not_become_the_name(self) -> None:
+        src = "class API_EXPORT Widget : public Base {\n  int x;\n};\n"
+        out = self._build({"w.hpp": src})
+        units = self._units(out)
+        self.assertIn("Widget", units)
+        self.assertEqual(units["Widget"]["kind"], "cpp_class")
+        self.assertNotIn("API_EXPORT", units)
+
+    def test_attribute_does_not_become_the_name(self) -> None:
+        src = "struct __attribute__((packed)) Header {\n  int a;\n};\n"
+        out = self._build({"h.h": src})
+        units = self._units(out)
+        self.assertIn("Header", units)
+        self.assertEqual(units["Header"]["kind"], "cpp_struct")
+        self.assertNotIn("__attribute__", units)
+
+    def test_brace_in_string_does_not_truncate_block(self) -> None:
+        src = (
+            "void render() {\n"
+            '  const char* fmt = "}";\n'
+            "  int y = 0;\n"
+            "  y++;\n"
+            "}\n"
+        )
+        out = self._build({"r.cpp": src})
+        render = self._units(out)["render"]
+        # The `}` inside the string literal must not close the function early.
+        self.assertEqual(render["line_range"], [1, 5])
+
+    def test_brace_in_comment_does_not_truncate_block(self) -> None:
+        src = (
+            "struct Foo {\n"
+            "  int x;  // closing } here in a comment\n"
+            "  int y;\n"
+            "};\n"
+        )
+        out = self._build({"c.h": src})
+        foo = self._units(out)["Foo"]
+        self.assertEqual(foo["line_range"], [1, 4])
+
+    def test_enum_named_classification_not_truncated(self) -> None:
+        # `enum classification` must not be parsed as `enum class` + `ification`.
+        src = "enum classification { A, B };\n"
+        out = self._build({"e.h": src})
+        units = self._units(out)
+        self.assertIn("classification", units)
+        self.assertEqual(units["classification"]["kind"], "cpp_enum")
+
 
 # ---------------------------------------------------------------------------
 # Item 2: Sources Read section must survive blank lines
