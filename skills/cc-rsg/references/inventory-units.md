@@ -24,6 +24,7 @@ Extension guide:
   - [Next.js specifics (App Router / Pages Router)](#nextjs-specifics-app-router--pages-router)
   - [Expo / React Native specifics](#expo--react-native-specifics)
 - [C#](#c)
+- [Dart / Flutter](#dart--flutter)
 - [SQL / database schema](#sql--database-schema)
 - [When language choice is ambiguous](#when-language-choice-is-ambiguous)
 - [Customisation and extension](#customisation-and-extension)
@@ -466,6 +467,76 @@ grep -rEn "\\[Http(Get|Post|Put|Patch|Delete)\\]" src/ --include="*.cs"
 
 ---
 
+## Dart / Flutter
+
+Flutter targets **desktop and mobile GUI apps** (and web). The dominant units
+are widgets, screens, state-management objects, and local persistence. The
+`source-map.py` Dart extractor emits `dart_class` / `dart_mixin` / `dart_enum`
+/ `dart_extension` / `dart_function` units; group them into the inventory below.
+
+### Macro units
+- Feature directories (`lib/features/<feature>/`, `lib/src/<feature>/`)
+- The package itself (`name` in `pubspec.yaml`)
+- App entry (`lib/main.dart`, `runApp(...)`)
+- Flavors / entry points (`main_dev.dart`, `main_prod.dart`)
+
+### Middle units
+- Widgets (`class X extends StatelessWidget` / `StatefulWidget`, and the paired `State<X>`)
+- Screens / pages (`*Screen`, `*Page`, or files under a `screens/` / `pages/` directory)
+- State management:
+  - Provider / Riverpod (`ChangeNotifier`, `Notifier`, `*Provider`, `Consumer`)
+  - Bloc / Cubit (`extends Bloc<Event, State>` / `extends Cubit<State>`)
+  - GetX (`GetxController`), MobX (`Store`)
+- Repositories / services / data sources (`*Repository`, `*Service`, `*DataSource`)
+- Models / entities (`class`, often with `fromJson` / `toJson`, `freezed`, `json_serializable`)
+- Routing (go_router `GoRoute`, `Navigator` routes, `onGenerateRoute`)
+- Enums, mixins, extensions
+
+### Micro units
+- Public methods on controllers / repositories
+- Model fields
+- Local DB schema (`sqflite` `CREATE TABLE`, Drift tables, Isar/Hive type adapters)
+- Build/runtime config (`--dart-define`, `String.fromEnvironment`, `flutter_dotenv`)
+
+### Dependencies
+- `pubspec.yaml` `dependencies` / `dev_dependencies`
+- Platform channels (`MethodChannel`, `EventChannel`) and native plugins
+- Generated code markers (`*.g.dart`, `*.freezed.dart`) — treat as derived, not primary
+
+### Extraction examples
+```bash
+# Widgets / classes / mixins / enums / extensions
+grep -rEn "^(abstract |final |sealed |base |mixin |interface )*(class|mixin|enum|extension) " lib/ --include="*.dart"
+
+# Widget subclasses specifically
+grep -rEn "extends (StatelessWidget|StatefulWidget|State<)" lib/ --include="*.dart"
+
+# State management
+grep -rEn "extends (ChangeNotifier|Bloc<|Cubit<|GetxController|StateNotifier<)|class .*Notifier" lib/ --include="*.dart"
+
+# Routes (go_router)
+grep -rEn "GoRoute\(|GoRouter\(" lib/ --include="*.dart"
+
+# Local DB schema
+grep -rEn "CREATE TABLE|Database\.|openDatabase\(" lib/ --include="*.dart"
+
+# Dependencies
+sed -n '/^dependencies:/,/^[a-z]/p' pubspec.yaml
+```
+
+### Flutter-specific cautions
+- A `StatefulWidget` and its `State<...>` are one logical unit — keep them in
+  one INV (or two tightly linked INVs), not scattered.
+- Generated files (`*.g.dart`, `*.freezed.dart`) are derived from annotations.
+  Inventory the **source** declaration, and exclude the generated file via
+  `exclusions.yaml` so MECE is not inflated.
+- State-management choice (Provider / Riverpod / Bloc / GetX) decides the data
+  flow chapter — identify it during recon and state it explicitly.
+- Platform differences (desktop window management, mobile permissions, file
+  access) belong in the build/distribution and operations chapters.
+
+---
+
 ## SQL / database schema
 
 Database schemas are part of the spec target alongside the source code itself.
@@ -510,12 +581,20 @@ A future version may split this into `references/inventory-units-{custom}.md`-st
 
 ## Instruction summary for the agent during extraction
 
-1. **First, run `scripts/source-map.py --target <root>`**. This auto-extracts file-level source units (SRC-NNNN) and saves them to `.cc-rsg/source-map.json`.
+1. **First, run `scripts/source-map.py --target <root>`**. This auto-extracts source units (SRC-NNNN) and saves them to `.cc-rsg/source-map.json`. It understands Ruby, Python, JavaScript/TypeScript, and Dart in detail, and records every other recognised source file (Swift, Kotlin, Rust, Go, C/C++, etc.) as a coarse file-level unit — so the MECE chain works on any stack.
 2. Identify the target codebase's primary language(s) from `recon-report.md`.
 3. Consult the matching section and plan an extraction strategy.
 4. **Group `source-map.json` units into conceptual units**. Many-to-one (multiple SRC → 1 INV) is acceptable, subject to the granularity rules below.
-5. Save the result to `inventory.json`. Schema lives in SKILL.md's Phase 2 section. For each inventory item, record the corresponding multiple SRC-NNNN in `related_source_ids`; Phase 4 verification uses this.
+5. Save the result to `inventory.json`. The canonical schema is in `references/phase-2-plan.md` (an object with a `units` array; fields `type`, `covered_by`). Optionally record the corresponding SRC-NNNN in `related_source_ids` as provenance — but note the MECE check does **not** read it. Phase 4 verification matches the `[REF: path:Lx-Ly]` markers you write in chapters against `source-map.json` (see `scripts/build-trace.py`).
 6. Tag commented-out / deprecated / test code that you encounter (e.g. `"deprecated": true`).
+
+### Fallback when source-map.py reports 0 units
+
+`source-map.py` already records recognised source files as file-level units, so
+a `files_scanned = 0` result means the stack uses extensions outside the
+recognised set. In that case, hand-generate a file-level `source-map.json`
+(one unit per source file, `kind: "file"`, `line_range: [1, N]`) before running
+`build-trace.py`, so the MECE coverage check still has a population to verify.
 
 ---
 
@@ -550,7 +629,11 @@ These are too coarse: maintainers cannot tell which file to modify.
 - 1 mailer class = 1 INV
 - For large controllers (300+ lines), **per-action additional INVs are allowed**
 
-`scripts/coverage-check.py` treats INVs whose `type` field contains `group` / `module` / `domain` / `category` / `bundle` / `section` as "macro type" and **fails if they exceed 20% of all INVs**.
+`scripts/coverage-check.py` treats an INV as "macro type" when its `type` ends
+with a grouping suffix (`_group` / `_bundle` / `_category` / `_section`) or one
+of its tokens is a bare grouping word (`group` / `bundle` / `category`), and
+**fails if such INVs exceed 20% of all INVs**. Legitimate layer names such as
+`domain`, `module`, or `service` are **not** treated as macro.
 
 ---
 

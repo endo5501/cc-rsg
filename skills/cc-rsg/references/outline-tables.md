@@ -266,6 +266,56 @@ rg "@(RestController|Controller|RequestMapping|GetMapping|PostMapping)" --type j
 
 ---
 
+## Dart / Flutter
+
+### Modules table
+
+| Directory | Role |
+|---|---|
+| `lib/main.dart` | App entry (`runApp`) |
+| `lib/features/<feature>/` or `lib/src/<feature>/` | Feature modules |
+| `lib/**/screens/` or `**/pages/` | Screens / pages |
+| `lib/**/widgets/` | Reusable widgets |
+| `lib/**/models/` | Models / entities |
+| `lib/**/repositories/` or `**/services/` | Data access / domain services |
+| `pubspec.yaml` | Package + dependencies |
+
+### Entities table (Widgets / models)
+
+```
+rg "^(abstract |final |sealed )*(class|mixin|enum|extension) (\w+)" --type dart
+rg "extends (StatelessWidget|StatefulWidget)" --type dart
+```
+
+Columns: Name / Kind (widget/model/enum/mixin) / File / Fields or props / Summary / Confidence
+
+### Actions table (Screens / routes / state)
+
+```
+rg "GoRoute\(|onGenerateRoute|Navigator\.(push|pushNamed)" --type dart
+rg "extends (ChangeNotifier|Bloc<|Cubit<|StateNotifier<|GetxController)" --type dart
+```
+
+Columns: Screen or controller / Trigger / Route or method / State touched / Summary / Confidence
+
+### Data table (local persistence)
+
+```
+rg "CREATE TABLE|openDatabase\(|@DriftDatabase|TypeAdapter" --type dart
+```
+
+Columns: Store (sqflite/Drift/Isar/Hive) / Table or box / Fields / Summary / Confidence
+
+### Dependencies table
+
+```
+sed -n '/^dependencies:/,/^[a-z]/p' pubspec.yaml
+```
+
+Columns: Package / Purpose / Platform-specific? / Summary / Confidence
+
+---
+
 ## Mermaid diagram templates
 
 In outline mode, generate at least one of each as Layer 2:

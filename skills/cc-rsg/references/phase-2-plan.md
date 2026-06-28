@@ -12,27 +12,41 @@ Read the applicable sections of `inventory-units.md` and
 including entry points, domain types, handlers, persistence units, routes,
 jobs, integrations, configuration, views, and tests.
 
-Write `.cc-rsg/inventory.json`:
+Write `.cc-rsg/inventory.json`. The canonical shape is an object with a
+`units` array; `scripts/coverage-check.py` reads `type` and `covered_by`:
 
 ```json
-[
-  {
-    "id": "INV-001",
-    "unit_type": "module",
-    "name": "Example",
-    "file": "src/example.py",
-    "lines": "1-120",
-    "chapter_id": "CH-02",
-    "status": "planned"
-  }
-]
+{
+  "units": [
+    {
+      "id": "INV-001",
+      "type": "service",
+      "name": "Example",
+      "file": "src/example.py",
+      "line": 1,
+      "chapter_id": "CH-02",
+      "covered_by": [],
+      "status": "planned"
+    }
+  ]
+}
 ```
+
+`covered_by` lists the chapter files that document the unit (filled during
+Phase 4). `related_source_ids` is optional free-form provenance; the MECE check
+does not read it — `scripts/build-trace.py` matches the `[REF: path:Lx-Ly]`
+markers written in chapters against `source-map.json` instead.
 
 Inventory IDs are stable for the run. Do not silently discard unknown units;
 classify them as `other` and assign them to a chapter or unresolved section.
 
-Use `scripts/source-map.py` when it supports the detected stack. Supplement it
-with repository search where required.
+Use `scripts/source-map.py` when it supports the detected stack. For stacks
+without a dedicated extractor it records each recognised source file as a
+coarse file-level unit, so the MECE chain still works; supplement it with
+repository search where finer granularity is required. Only if `source-map.py`
+yields **zero** units should you hand-generate a file-level `source-map.json`
+(one unit per source file, `line_range: [1, N]`) before running
+`build-trace.py`.
 
 ## Chapter skeleton
 

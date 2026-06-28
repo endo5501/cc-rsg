@@ -219,6 +219,7 @@ Read only resources needed for the current phase:
 - `templates/batch-system.md`: batch specification.
 - `templates/api-service.md`: API specification.
 - `templates/library-sdk.md`: library or SDK specification.
+- `templates/gui-app.md`: desktop / mobile GUI application specification.
 
 Bundled deterministic scripts:
 

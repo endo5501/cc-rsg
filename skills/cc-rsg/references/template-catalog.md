@@ -4,14 +4,15 @@ Selection guide used in Phase 1 when presenting template candidates to the user.
 
 ---
 
-## Initial set of 4
+## Initial set of 5
 
-The skill ships with the following 4 templates by default. The user may also bring their own template (by specifying a path).
+The skill ships with the following 5 templates by default. The user may also bring their own template (by specifying a path).
 
 1. **Web application spec** (`templates/web-app.md`)
 2. **Batch-system spec** (`templates/batch-system.md`)
 3. **API service spec** (`templates/api-service.md`)
 4. **Library / SDK spec** (`templates/library-sdk.md`)
+5. **Desktop / mobile GUI application spec** (`templates/gui-app.md`)
 
 ---
 
@@ -118,6 +119,34 @@ The skill ships with the following 4 templates by default. The user may also bri
 
 ---
 
+## 5. Desktop / mobile GUI application spec
+
+### Target
+- Client-side apps the user operates through native screens (not server-rendered HTML).
+- Flutter (desktop / mobile / web), React Native / Expo, Electron / Tauri,
+  native iOS (Swift/SwiftUI), native Android (Kotlin/Compose), desktop GUI (Qt, WPF, Avalonia).
+- Local state management, an on-device store, and a per-platform build/distribution pipeline.
+
+### Chapter outline
+- Overview / application purpose
+- Architecture overview (state-management approach)
+- Screens and navigation
+- Features and behaviour
+- State management and data flow
+- Data model and local persistence
+- External / native integration
+- Build and distribution (per platform)
+- Known constraints and unresolved items
+
+### Selection criteria
+- A client app manifest: `pubspec.yaml` (Flutter), `app.json`/`eas.json` (Expo),
+  Electron `package.json` `main`, `*.xcodeproj` / `build.gradle` (native).
+- UI built from widgets/components (`StatelessWidget`/`StatefulWidget`, JSX screens, etc.).
+- On-device persistence (sqflite/Drift/Isar/Hive/Realm/Core Data/Room).
+- Navigation graph rather than server routes; no HTML templating engine.
+
+---
+
 ## Decision tree (agent recommendation logic)
 
 Based on the Phase 1 reconnaissance, the agent follows this procedure to recommend a template:
@@ -128,15 +157,20 @@ Based on the Phase 1 reconnaissance, the agent follows this procedure to recomme
             NO  → Recommend Library / SDK spec
             YES → Continue
 
-2. Do routing definitions exist?
+2. Is it a client-side GUI app?
+   (pubspec.yaml / Expo app.json / Electron main / *.xcodeproj / build.gradle,
+    UI built from widgets/components, on-device store, navigation graph)
+   YES → Recommend Desktop / mobile GUI application spec
+
+3. Do routing definitions exist?
    YES → Is there HTML rendering (views/templates)?
             YES → Recommend Web application spec
             NO  → Recommend API service spec
 
-3. Are scheduler configuration / batch scripts the main subject?
+4. Are scheduler configuration / batch scripts the main subject?
    YES → Recommend Batch-system spec
 
-4. None of the above / composite type
+5. None of the above / composite type
    → Present multiple candidates and ask the user.
    → Example: "Includes both web app and API; recommend a merged custom outline."
 ```
@@ -227,8 +261,10 @@ After OSS release, the following templates may be added in response to user requ
 - Data warehouse / DWH spec
 - Machine-learning pipeline spec
 - Infrastructure spec (IaC, Terraform, Kubernetes)
-- Mobile app spec (iOS / Android / React Native / Flutter)
 - Blockchain / smart-contract spec
 - Game-design spec
+
+(Desktop / mobile GUI apps — including Flutter and React Native — are now
+covered by the bundled `gui-app.md` template.)
 
 Requests are received via GitHub Issues.

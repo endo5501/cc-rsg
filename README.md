@@ -112,8 +112,11 @@ traceability index.
 ## Bundled coverage
 
 Inventory guidance includes PHP, COBOL/JCL, Python, Java/Kotlin,
-JavaScript/TypeScript, C#, Go, Ruby on Rails, Flask, FastAPI, Next.js, Expo,
-and React Native patterns.
+JavaScript/TypeScript, C#, Go, Dart/Flutter, Ruby on Rails, Flask, FastAPI,
+Next.js, Expo, and React Native patterns. `source-map.py` extracts Ruby,
+Python, JavaScript/TypeScript, and Dart units directly, and records every other
+recognised source file (Swift, Kotlin, Rust, Go, C/C++, and more) as a coarse
+file-level unit so the coverage and MECE checks work on any stack.
 
 Bundled templates:
 
@@ -121,6 +124,7 @@ Bundled templates:
 - Batch system
 - API service
 - Library or SDK
+- Desktop / mobile GUI application
 
 ## Runtime portability
 
