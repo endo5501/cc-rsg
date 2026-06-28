@@ -24,6 +24,7 @@ Extension guide:
   - [Next.js specifics (App Router / Pages Router)](#nextjs-specifics-app-router--pages-router)
   - [Expo / React Native specifics](#expo--react-native-specifics)
 - [C#](#c)
+- [C / C++](#c--c)
 - [Dart / Flutter](#dart--flutter)
 - [SQL / database schema](#sql--database-schema)
 - [When language choice is ambiguous](#when-language-choice-is-ambiguous)
@@ -467,6 +468,70 @@ grep -rEn "\\[Http(Get|Post|Put|Patch|Delete)\\]" src/ --include="*.cs"
 
 ---
 
+## C / C++
+
+C/C++ targets range from **CLIs and system daemons** to **embedded firmware**,
+**libraries/SDKs**, and **desktop apps**. The `source-map.py` C/C++ extractor
+emits `cpp_class` / `cpp_struct` / `cpp_union` / `cpp_enum` / `cpp_namespace` /
+`cpp_function` units (a single `cpp_` prefix covers both C and C++); group them
+into the inventory below. Header files with only prototypes fall back to a
+coarse `source_file` unit.
+
+### Macro units
+- Build targets / modules (`CMakeLists.txt` targets, `Makefile` rules, `add_library` / `add_executable`)
+- Namespaces (`namespace`, C++ only) and top-level library headers
+- The package / component itself (a directory of related `.c`/`.cpp` + headers)
+- Program entry (`int main(...)`)
+
+### Middle units
+- Classes (`class X`, often with a base list `: public Base`)
+- Structs / unions (`struct`, `union` — the dominant aggregate in C)
+- Enums (`enum`, `enum class` / `enum struct`)
+- Free functions and out-of-line member definitions (`ReturnType Class::method(...)`)
+- Templates (`template<...> class/struct/function`) — treat as the declared entity
+- Public API surface exported from headers
+
+### Micro units
+- Public methods on classes
+- Struct / union fields
+- Macros (`#define`), compile-time config (`#ifdef`, build flags)
+- Global constants and `extern` declarations
+
+### Dependencies
+- Build system (`CMakeLists.txt`, `Makefile`, `meson.build`, Bazel)
+- `#include` graph (system vs. project headers)
+- Linked libraries (`target_link_libraries`, `-l` flags) and package managers (Conan, vcpkg)
+
+### Extraction examples
+```bash
+# Classes / structs / unions / enums / namespaces
+grep -rEn "^[[:space:]]*(typedef[[:space:]]+)?(class|struct|union|enum|namespace)[[:space:]]" \
+  src/ --include="*.c" --include="*.cc" --include="*.cpp" --include="*.h" --include="*.hpp"
+
+# Top-level / out-of-line function definitions (signature followed by `{`, no trailing `;`)
+grep -rEn "^[A-Za-z_].*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\\([^;]*$" src/ --include="*.cpp"
+
+# Macros and conditional compilation
+grep -rEn "^[[:space:]]*#[[:space:]]*(define|ifdef|ifndef|if)" src/ --include="*.h"
+
+# Build targets
+grep -rEn "add_(library|executable)\\(" . --include=CMakeLists.txt
+```
+
+### C/C++-specific cautions
+- Regex extraction is conservative (the project does not use tree-sitter). Known gaps:
+  - Anonymous structs named via `typedef struct {…} Name;` are not captured by name
+    (the `struct Name {…}` form is). Add such units manually if they are load-bearing.
+  - Function signatures spanning multiple lines (return type / args wrapped) may be missed.
+  - Macro-generated declarations and heavy template metaprogramming are out of scope.
+- `.h` is ambiguous (C or C++); both are handled by the same `cpp_*` kinds. A header
+  with only prototypes/forward declarations is recorded as one `source_file` unit so
+  MECE coverage is preserved — inventory the **defining** translation unit.
+- Separate the public API (headers) from the implementation (`.c`/`.cpp`) when the
+  spec distinguishes interface from internals.
+
+---
+
 ## Dart / Flutter
 
 Flutter targets **desktop and mobile GUI apps** (and web). The dominant units
@@ -581,7 +646,7 @@ A future version may split this into `references/inventory-units-{custom}.md`-st
 
 ## Instruction summary for the agent during extraction
 
-1. **First, run `scripts/source-map.py --target <root>`**. This auto-extracts source units (SRC-NNNN) and saves them to `.cc-rsg/source-map.json`. It understands Ruby, Python, JavaScript/TypeScript, and Dart in detail, and records every other recognised source file (Swift, Kotlin, Rust, Go, C/C++, etc.) as a coarse file-level unit — so the MECE chain works on any stack.
+1. **First, run `scripts/source-map.py --target <root>`**. This auto-extracts source units (SRC-NNNN) and saves them to `.cc-rsg/source-map.json`. It understands Ruby, Python, JavaScript/TypeScript, Dart, and C/C++ in detail, and records every other recognised source file (Swift, Kotlin, Rust, Go, etc.) as a coarse file-level unit — so the MECE chain works on any stack.
 2. Identify the target codebase's primary language(s) from `recon-report.md`.
 3. Consult the matching section and plan an extraction strategy.
 4. **Group `source-map.json` units into conceptual units**. Many-to-one (multiple SRC → 1 INV) is acceptable, subject to the granularity rules below.

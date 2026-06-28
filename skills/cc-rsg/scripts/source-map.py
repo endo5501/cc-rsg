@@ -15,6 +15,7 @@ traceability:
 - Python:      class / def level
 - JavaScript:  export level, function definitions
 - Dart:        class / mixin / enum / extension / top-level function level
+- C/C++:       class / struct / union / enum / namespace / function level
 - Other src:   file level (any recognised text source extension)
 - Other:       file level (coarse, but far better than nothing)
 
@@ -110,6 +111,28 @@ DART_TOP_FN_RE = re.compile(
 DART_FN_KEYWORDS = {
     "if", "for", "while", "switch", "catch", "return", "assert", "await",
     "class", "enum", "mixin", "extension", "import", "export", "part", "library",
+}
+# C/C++ type declarations: class / struct / union / enum / namespace, with an
+# optional `enum class` / `enum struct` form. Leading `typedef` / `template<...>`
+# / `export` qualifiers are tolerated. The trailing group keeps the inheritance
+# list / brace for the signature. Anonymous declarations (no name) are skipped.
+CPP_TYPE_RE = re.compile(
+    r"^(\s*)(?:(?:typedef|template\s*<[^>]*>|export)\s+)*"
+    r"(class|struct|union|enum|namespace)\b"
+    r"(?:\s+(?:class|struct))?"
+    r"\s+([A-Za-z_][A-Za-z0-9_]*)([^\n]*)"
+)
+# C/C++ top-level function definitions: return type (may carry `::`, `*`, `&`,
+# template args, etc.) + name + `(`, with no `;` after the paren so prototypes
+# and declarations are excluded. Out-of-line members (`void Foo::bar()`) match
+# with the class qualifier absorbed into the return-type group; name == `bar`.
+CPP_FN_RE = re.compile(
+    r"^([A-Za-z_~][A-Za-z0-9_:<>,.\*&\s~]*?[\s\*&:>])([A-Za-z_~][A-Za-z0-9_]*)\s*\([^;]*$"
+)
+CPP_FN_KEYWORDS = {
+    "if", "for", "while", "switch", "catch", "return", "sizeof", "do",
+    "else", "case", "goto", "typedef", "using", "static_assert",
+    "class", "struct", "union", "enum", "namespace", "template",
 }
 
 
@@ -307,6 +330,48 @@ def extract_dart_units(rel_path: str, source: str, id_factory) -> Iterable[Sourc
                     )
 
 
+def extract_cpp_units(rel_path: str, source: str, id_factory) -> Iterable[SourceUnit]:
+    lines = source.splitlines()
+    for i, line in enumerate(lines):
+        m_type = CPP_TYPE_RE.match(line)
+        if m_type:
+            indent, kw, name, rest = m_type.groups()
+            # Skip forward declarations / variable declarations: a line that ends
+            # with `;` and opens no brace (e.g. `class Foo;`, `struct Node* p;`).
+            if line.rstrip().endswith(";") and "{" not in line:
+                continue
+            end_line = extract_brace_block(lines, i)
+            block_text = "\n".join(lines[i:end_line])
+            yield SourceUnit(
+                id=id_factory(),
+                path=rel_path,
+                line_range=(i + 1, end_line),
+                kind=f"cpp_{kw}",
+                name=name,
+                signature=f"{kw} {name}{rest}".strip()[:240],
+                fingerprint=fingerprint(block_text),
+            )
+            continue
+        # Top-level function definitions only (column 0; skip control flow and
+        # member functions written inside a class body, which are indented).
+        if line and not line[0].isspace():
+            m_fn = CPP_FN_RE.match(line)
+            if m_fn:
+                ret, name = m_fn.groups()
+                if ret.split()[-1] not in CPP_FN_KEYWORDS and name not in CPP_FN_KEYWORDS:
+                    end_line = extract_brace_block(lines, i)
+                    block_text = "\n".join(lines[i:end_line])
+                    yield SourceUnit(
+                        id=id_factory(),
+                        path=rel_path,
+                        line_range=(i + 1, end_line),
+                        kind="cpp_function",
+                        name=name,
+                        signature=line.strip()[:240],
+                        fingerprint=fingerprint(block_text),
+                    )
+
+
 def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> SourceUnit:
     """File-granularity coarse unit (used for migrations / views / configs, etc.)."""
     lines = source.splitlines()
@@ -332,7 +397,7 @@ def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> Sour
 # Binaries, images, and generic prose are deliberately excluded.
 GENERIC_SOURCE_EXTENSIONS = (
     ".swift", ".kt", ".kts", ".java", ".scala", ".groovy", ".clj", ".cljs",
-    ".rs", ".go", ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp",
+    ".rs", ".go",
     ".m", ".mm", ".cs", ".fs", ".php", ".pl", ".pm", ".lua", ".r",
     ".ex", ".exs", ".erl", ".hs", ".ml", ".sh", ".bash", ".ps1",
     ".gradle", ".cmake", ".tf", ".proto", ".graphql", ".gql",
@@ -362,6 +427,9 @@ def classify_file(rel_path: str) -> list[str]:
         strategies.append("js_export")
     elif p.endswith(".dart"):
         strategies.append("dart_decl")
+    elif p.endswith((".c", ".cc", ".cpp", ".cxx", ".c++",
+                     ".h", ".hh", ".hpp", ".hxx", ".h++", ".ipp", ".tpp")):
+        strategies.append("cpp_decl")
     elif p.endswith((".erb", ".html.erb", ".html", ".vue", ".svelte")):
         strategies.append("view_file")
     elif p.endswith((".yml", ".yaml", ".toml", ".ini", ".conf", ".cfg")):
@@ -462,6 +530,16 @@ def build_source_map(
                 units.extend(extract_js_units(rel_path, source, id_factory))
             elif strat == "dart_decl":
                 units.extend(extract_dart_units(rel_path, source, id_factory))
+            elif strat == "cpp_decl":
+                cpp_units = list(extract_cpp_units(rel_path, source, id_factory))
+                if cpp_units:
+                    units.extend(cpp_units)
+                else:
+                    # Prototype-only headers and the like: keep a coarse file-level
+                    # unit so MECE coverage does not silently drop the file.
+                    units.append(
+                        extract_file_unit(rel_path, source, "source_file", id_factory)
+                    )
             elif strat == "source_file":
                 units.append(extract_file_unit(rel_path, source, "source_file", id_factory))
             elif strat == "view_file":
