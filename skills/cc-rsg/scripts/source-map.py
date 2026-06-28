@@ -165,7 +165,10 @@ def extract_brace_block(lines: list[str], start_idx: int) -> int:
                 depth -= 1
         if seen_open and depth <= 0:
             return j + 1  # 1-indexed
-        if not seen_open and (";" in lines[j] or "=>" in lines[j]) and j > start_idx:
+        # A bodyless declaration terminates at the first `;`/`=>` before any
+        # brace opens — e.g. `class C = A with B;` or `T f() => expr;`. This is
+        # valid on the start line itself (mixin-application classes).
+        if not seen_open and (";" in lines[j] or "=>" in lines[j]):
             return j + 1
     return len(lines)
 
@@ -285,8 +288,8 @@ def extract_dart_units(rel_path: str, source: str, id_factory) -> Iterable[Sourc
                 fingerprint=fingerprint(block_text),
             )
             continue
-        # Top-level functions only (indent must be empty; skip control flow).
-        if line[:1].strip():
+        # Top-level functions only (column 0, no indent; skip control flow).
+        if line and not line[0].isspace():
             m_fn = DART_TOP_FN_RE.match(line)
             if m_fn:
                 ret, name = m_fn.groups()

@@ -83,10 +83,12 @@ SOURCES_READ_RE = re.compile(r"^##+\s*Sources\s*Read\b", re.IGNORECASE)
 SOURCES_READ_ITEM_RE = re.compile(r"^\s*[-*]\s+`?([^`\n]+?)`?(?:\s*\([^)]*\))?\s*$")
 
 # Confidence labels (outline/interactive mode). Each cell is counted once,
-# whether written as "🟢 VERIFIED", "VERIFIED", or "🟢" alone.
-VERIFIED_RE = re.compile(r"🟢\s*VERIFIED|VERIFIED|🟢")
-INFERRED_RE = re.compile(r"🟡\s*INFERRED|INFERRED|🟡")
-ASSUMED_RE = re.compile(r"🔴\s*ASSUMED|ASSUMED|🔴")
+# whether written as "🟢 VERIFIED", "VERIFIED", or "🟢" alone. The emoji form
+# makes the word optional so the once-only count does not depend on alternation
+# order.
+VERIFIED_RE = re.compile(r"🟢(?:\s*VERIFIED)?|VERIFIED")
+INFERRED_RE = re.compile(r"🟡(?:\s*INFERRED)?|INFERRED")
+ASSUMED_RE = re.compile(r"🔴(?:\s*ASSUMED)?|ASSUMED")
 
 # Grouping suffixes that mark a "macro" INV type (matched against the `type`
 # field). A type is also macro if one of its tokens is a bare grouping word.
@@ -309,12 +311,12 @@ def compute_chapter_metrics(name: str, content: str) -> ChapterMetrics:
             in_sources_read = True
             continue
         if in_sources_read:
-            # End when the next heading appears; otherwise count list items.
-            if line.startswith("#"):
-                in_sources_read = False
-            elif SOURCES_READ_ITEM_RE.match(line):
+            # Count bullet items; any heading or non-bullet line ends the
+            # section and is reprocessed below as ordinary body content.
+            if not line.startswith("#") and SOURCES_READ_ITEM_RE.match(line):
                 sources_read_count += 1
-            continue
+                continue
+            in_sources_read = False
         body_lines += 1
         refs += len(REF_RE.findall(line))
 

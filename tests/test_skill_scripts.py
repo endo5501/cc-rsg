@@ -115,6 +115,25 @@ class SourceMapDartTests(unittest.TestCase):
         self.assertLessEqual(start, end)
         self.assertGreaterEqual(end - start, 3)  # spans the class body
 
+    def test_mixin_application_class_does_not_engulf_next(self) -> None:
+        # `class C = A with B;` is a valid one-line Dart class with no braces.
+        # Its unit must not swallow the following class.
+        src = (
+            "class Controller = BaseController with LoggingMixin;\n"
+            "\n"
+            "class Widget extends StatelessWidget {\n"
+            "  Widget build(c) {\n"
+            "    return null;\n"
+            "  }\n"
+            "}\n"
+        )
+        out = self._build({"a.dart": src})
+        ctrl = next(u for u in out["units"] if u["name"] == "Controller")
+        # The alias class occupies only its own line.
+        self.assertEqual(ctrl["line_range"], [1, 1])
+        # The following widget class is still extracted independently.
+        self.assertIn("Widget", {u["name"] for u in out["units"]})
+
     def test_unit_paths_use_forward_slashes(self) -> None:
         # Paths must be POSIX-style so [REF:] markers and exclude globs match
         # on Windows (build-trace.py matches forward-slash reference paths).
@@ -149,6 +168,19 @@ class SourcesReadTests(unittest.TestCase):
         )
         m = coverage_check.compute_chapter_metrics("01-x.md", content)
         self.assertEqual(m.sources_read_count, 1)
+
+    def test_trailing_prose_after_sources_read_still_counts(self) -> None:
+        # Non-canonical: prose (with a REF) after the Sources Read list, no
+        # intervening heading. It must not be swallowed by the section.
+        content = (
+            "## Sources Read\n\n"
+            "- `lib/a.dart`\n\n"
+            "A trailing note. [REF: lib/a.dart:1-2]\n"
+        )
+        m = coverage_check.compute_chapter_metrics("01-x.md", content)
+        self.assertEqual(m.sources_read_count, 1)
+        self.assertEqual(m.refs, 1)
+        self.assertGreaterEqual(m.body_lines, 1)
 
 
 # ---------------------------------------------------------------------------
