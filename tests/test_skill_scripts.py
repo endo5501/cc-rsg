@@ -365,6 +365,177 @@ class SourceMapCppTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Item 1c: optional high-fidelity C/C++ tier (libclang + compile_commands.json)
+# ---------------------------------------------------------------------------
+
+class CompileCommandsDiscoveryTests(unittest.TestCase):
+    """Pure: locating compile_commands.json (no libclang needed)."""
+
+    def test_explicit_file_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ccj = root / "build" / "compile_commands.json"
+            ccj.parent.mkdir(parents=True)
+            ccj.write_text("[]", encoding="utf-8")
+            found = source_map.find_compile_commands(root / "src", explicit=ccj)
+            self.assertEqual(found, ccj.parent)
+
+    def test_explicit_dir_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "compile_commands.json").write_text("[]", encoding="utf-8")
+            found = source_map.find_compile_commands(root / "src", explicit=root)
+            self.assertEqual(found, root)
+
+    def test_autodiscover_in_build_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "src"
+            target.mkdir()
+            ccj = root / "build" / "compile_commands.json"
+            ccj.parent.mkdir(parents=True)
+            ccj.write_text("[]", encoding="utf-8")
+            found = source_map.find_compile_commands(target)
+            self.assertEqual(found, ccj.parent)
+
+    def test_returns_none_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "src"
+            target.mkdir()
+            self.assertIsNone(source_map.find_compile_commands(target))
+
+
+class ClangKindMapTests(unittest.TestCase):
+    """Pure: cursor-kind name → cpp_* kind (no libclang needed)."""
+
+    def test_type_kinds(self) -> None:
+        self.assertEqual(source_map.clang_kind_to_cpp("CLASS_DECL"), "cpp_class")
+        self.assertEqual(source_map.clang_kind_to_cpp("CLASS_TEMPLATE"), "cpp_class")
+        self.assertEqual(source_map.clang_kind_to_cpp("STRUCT_DECL"), "cpp_struct")
+        self.assertEqual(source_map.clang_kind_to_cpp("UNION_DECL"), "cpp_union")
+        self.assertEqual(source_map.clang_kind_to_cpp("ENUM_DECL"), "cpp_enum")
+        self.assertEqual(source_map.clang_kind_to_cpp("NAMESPACE"), "cpp_namespace")
+
+    def test_function_kinds(self) -> None:
+        for k in ("FUNCTION_DECL", "CXX_METHOD", "CONSTRUCTOR",
+                  "DESTRUCTOR", "CONVERSION_FUNCTION"):
+            self.assertEqual(source_map.clang_kind_to_cpp(k), "cpp_function", k)
+
+    def test_unknown_kind(self) -> None:
+        self.assertIsNone(source_map.clang_kind_to_cpp("PARM_DECL"))
+        self.assertIsNone(source_map.clang_kind_to_cpp("FIELD_DECL"))
+
+
+class CppUnitsFromDeclsTests(unittest.TestCase):
+    """Pure: intermediate decl records → SourceUnits (no libclang needed)."""
+
+    def _factory(self):
+        n = [0]
+
+        def f():
+            n[0] += 1
+            return f"SRC-{n[0]:04d}"
+        return f
+
+    def test_dedup_across_translation_units(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            f = root / "proj" / "a.cpp"
+            f.parent.mkdir(parents=True)
+            f.write_text("struct S { int x; };\nint g() { return 0; }\n",
+                         encoding="utf-8")
+            # The same header decl seen from two TUs → one unit.
+            decls = [
+                {"path": "proj/a.cpp", "start_line": 1, "end_line": 1,
+                 "kind": "cpp_struct", "name": "S", "signature": "S"},
+                {"path": "proj/a.cpp", "start_line": 1, "end_line": 1,
+                 "kind": "cpp_struct", "name": "S", "signature": "S"},
+                {"path": "proj/a.cpp", "start_line": 2, "end_line": 2,
+                 "kind": "cpp_function", "name": "g", "signature": "g()"},
+            ]
+            units = source_map.cpp_units_from_decls(decls, root, self._factory())
+            self.assertEqual(len(units), 2)
+            s = next(u for u in units if u.name == "S")
+            self.assertEqual(s.kind, "cpp_struct")
+            self.assertEqual(s.line_range, (1, 1))
+            self.assertTrue(s.fingerprint.startswith("sha1:"))
+            self.assertTrue(s.id.startswith("SRC-"))
+
+    def test_deterministic_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            f = root / "a.cpp"
+            f.write_text("\n".join(f"// line {i}" for i in range(20)),
+                         encoding="utf-8")
+            decls = [
+                {"path": "a.cpp", "start_line": 10, "end_line": 11,
+                 "kind": "cpp_function", "name": "b", "signature": "b()"},
+                {"path": "a.cpp", "start_line": 2, "end_line": 3,
+                 "kind": "cpp_function", "name": "a", "signature": "a()"},
+            ]
+            units = source_map.cpp_units_from_decls(decls, root, self._factory())
+            self.assertEqual([u.name for u in units], ["a", "b"])
+
+
+@unittest.skipUnless(source_map.HAS_LIBCLANG, "libclang not installed")
+class ClangTierEndToEndTests(unittest.TestCase):
+    """libclang-backed extraction via a hand-written compile_commands.json."""
+
+    def _build_with_db(self, files: dict[str, str]):
+        tmp = tempfile.mkdtemp()
+        root = Path(tmp)
+        target = root / "proj"
+        target.mkdir()
+        for rel, content in files.items():
+            p = target / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(content, encoding="utf-8")
+        # Hand-written compile DB: one TU per .c/.cpp under target.
+        db = []
+        for rel in files:
+            if rel.endswith((".c", ".cc", ".cpp", ".cxx")):
+                src = (target / rel).resolve()
+                db.append({
+                    "directory": target.as_posix(),
+                    "file": src.as_posix(),
+                    "arguments": ["clang", "-std=c++17", "-c", rel],
+                })
+        (root / "compile_commands.json").write_text(
+            json.dumps(db), encoding="utf-8")
+        out = source_map.build_source_map(
+            target, source_map.DEFAULT_EXCLUDES, compile_commands=root)
+        return out
+
+    def test_macro_class_and_struct_return_function(self) -> None:
+        src = (
+            "#define API_EXPORT __attribute__((visibility(\"default\")))\n"
+            "namespace app {\n"
+            "class API_EXPORT Widget { public: int value() const { return 1; } };\n"
+            "}\n"
+            "struct Node* make_node(int v) { return 0; }\n"
+        )
+        out = self._build_with_db({"a.cpp": src})
+        by_name = {u["name"]: u for u in out["units"]}
+        # AST resolves the macro'd class name and the struct-returning function.
+        self.assertEqual(by_name["Widget"]["kind"], "cpp_class")
+        self.assertEqual(by_name["make_node"]["kind"], "cpp_function")
+        self.assertNotIn("Node", by_name)  # not a type definition
+        self.assertNotIn("API_EXPORT", by_name)
+        self.assertEqual(out["stats"]["cpp_extractor"], "clang")
+
+    def test_uncovered_file_falls_back_to_regex(self) -> None:
+        # b.cpp is NOT in the compile DB → regex extractor must still cover it.
+        out = self._build_with_db({
+            "a.cpp": "int main() { return 0; }\n",
+            "b.cpp": "class OnlyInB {\n  int z;\n};\n",  # not in DB
+        })
+        by_name = {u["name"]: u for u in out["units"]}
+        self.assertIn("OnlyInB", by_name)
+        self.assertEqual(by_name["OnlyInB"]["kind"], "cpp_class")
+        self.assertEqual(out["stats"]["cpp_extractor"], "mixed")
+
+
+# ---------------------------------------------------------------------------
 # Item 2: Sources Read section must survive blank lines
 # ---------------------------------------------------------------------------
 
