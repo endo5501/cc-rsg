@@ -545,7 +545,9 @@ Enable it:
    (Other build systems: Bear `bear -- make`, or `compiledb`.)
 2. `pip install libclang` (bundles the native library; no separate LLVM needed).
 3. Run with `--compile-commands <build dir or compile_commands.json>` (the file
-   is also auto-discovered in `build/`, `out/`, `cmake-build-*`).
+   is also auto-discovered in `build/`, `out/`, `cmake-build-*`, and one level
+   below those — e.g. multi-config layouts like `build/msvc_release/`; a direct
+   `build/compile_commands.json` wins, ties go to the most recent build).
 
 The output schema is **identical** to the regex tier (same `cpp_*` kinds, line
 ranges, fingerprints), so the MECE / coverage / traceability chain is unchanged;

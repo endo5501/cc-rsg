@@ -538,7 +538,10 @@ def find_compile_commands(target: Path, explicit: str | Path | None = None) -> P
     """
     Return the directory containing a usable `compile_commands.json`, or None.
     `explicit` may be the file itself or its directory. Auto-discovery looks in
-    the target, its parent, and common build subdirectories of both.
+    the target and its parent: directly, in common build dirs, and one level
+    below those build dirs (multi-config layouts like `build/msvc_release/`).
+    A direct `build/compile_commands.json` wins over a nested config dir; ties
+    between sibling config dirs are broken by most-recently-modified database.
     """
     if explicit is not None:
         p = Path(explicit)
@@ -549,13 +552,30 @@ def find_compile_commands(target: Path, explicit: str | Path | None = None) -> P
         return None
 
     target = Path(target)
-    roots = [target, target.parent]
-    for root in roots:
+    for root in (target, target.parent):
         if (root / "compile_commands.json").is_file():
             return root
+        candidates: list[Path] = []
         for sub in _BUILD_DIR_CANDIDATES:
-            if (root / sub / "compile_commands.json").is_file():
-                return root / sub
+            base = root / sub
+            if not base.is_dir():
+                continue
+            if (base / "compile_commands.json").is_file():
+                candidates.append(base)
+            # One level below the build dir (e.g. build/<config>/).
+            for child in sorted(base.iterdir()):
+                if child.is_dir() and (child / "compile_commands.json").is_file():
+                    candidates.append(child)
+        if candidates:
+            # Shallowest path first (direct build/ beats a nested config dir);
+            # break ties by newest database mtime.
+            candidates.sort(
+                key=lambda d: (
+                    len(d.parts),
+                    -(d / "compile_commands.json").stat().st_mtime,
+                )
+            )
+            return candidates[0]
     return None
 
 
@@ -917,8 +937,9 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to compile_commands.json (or its directory) for the optional "
              "high-fidelity C/C++ extractor. Requires `pip install libclang`. "
-             "Auto-discovered in common build dirs when omitted; falls back to "
-             "the regex extractor when unavailable.",
+             "Auto-discovered in common build dirs (and one level below, e.g. "
+             "build/<config>/) when omitted; falls back to the regex extractor "
+             "when unavailable.",
     )
     args = parser.parse_args(argv)
 
