@@ -116,7 +116,10 @@ JavaScript/TypeScript, C#, Go, Dart/Flutter, Ruby on Rails, Flask, FastAPI,
 Next.js, Expo, and React Native patterns. `source-map.py` extracts Ruby,
 Python, JavaScript/TypeScript, Dart, and C/C++ units directly, and records every
 other recognised source file (Swift, Kotlin, Rust, Go, and more) as a coarse
-file-level unit so the coverage and MECE checks work on any stack.
+file-level unit so the coverage and MECE checks work on any stack. C/C++ has an
+optional high-fidelity mode: with `pip install libclang` and a
+`compile_commands.json` (e.g. CMake's `CMAKE_EXPORT_COMPILE_COMMANDS=ON`), pass
+`--compile-commands` to parse via libclang; it falls back to regex when absent.
 
 Bundled templates:
 

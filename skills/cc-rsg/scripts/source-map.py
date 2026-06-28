@@ -9,6 +9,16 @@ Source-unit definitions are implemented as language-specific regexes.
 Tree-sitter adds dependencies and is not used in v1; we stay with
 maintainable regex-based extraction.
 
+Optional high-fidelity C/C++ tier: when the `clang` Python bindings
+(`pip install libclang`) are importable AND a `compile_commands.json`
+compilation database is available (e.g. CMake with
+`CMAKE_EXPORT_COMPILE_COMMANDS=ON`), C/C++ files covered by the database are
+parsed with libclang for accurate units (macro expansion, templates,
+multi-line signatures, anonymous `typedef struct` names). It degrades to the
+regex extractor when libclang or the database is missing, so the default
+behaviour and zero-dependency / no-build guarantees are unchanged. Pass the
+database via `--compile-commands`; the output schema is identical either way.
+
 A source unit is the smallest item for which the spec wants
 traceability:
 - Ruby/Rails:  class / module level, controller action level, route group, migration, view
@@ -63,6 +73,17 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
+
+# libclang is an OPTIONAL high-fidelity backend for C/C++ (see the `Optional
+# high-fidelity C/C++ tier` note in the module docstring). It is not in the
+# stdlib; when absent we silently fall back to the regex extractor. Mirrors the
+# optional-yaml pattern in build-trace.py.
+try:
+    import clang.cindex as clang_cindex  # type: ignore
+    HAS_LIBCLANG = True
+except ImportError:  # pragma: no cover - depends on the environment
+    clang_cindex = None  # type: ignore
+    HAS_LIBCLANG = False
 
 
 # ----------------------------------------------------------------------------
@@ -483,6 +504,178 @@ def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> Sour
 
 
 # ----------------------------------------------------------------------------
+# Optional high-fidelity C/C++ tier (libclang + compile_commands.json)
+# ----------------------------------------------------------------------------
+
+# clang cursor-kind name -> our cpp_* kind. Keeps the existing kind registry so
+# downstream (build-trace / coverage-check) needs no changes.
+CLANG_KIND_MAP = {
+    "CLASS_DECL": "cpp_class",
+    "CLASS_TEMPLATE": "cpp_class",
+    "CLASS_TEMPLATE_PARTIAL_SPECIALIZATION": "cpp_class",
+    "STRUCT_DECL": "cpp_struct",
+    "UNION_DECL": "cpp_union",
+    "ENUM_DECL": "cpp_enum",
+    "NAMESPACE": "cpp_namespace",
+    "FUNCTION_DECL": "cpp_function",
+    "CXX_METHOD": "cpp_function",
+    "CONSTRUCTOR": "cpp_function",
+    "DESTRUCTOR": "cpp_function",
+    "CONVERSION_FUNCTION": "cpp_function",
+}
+
+# Common build-dir names searched (relative to the target and its parent) when
+# no explicit compile-commands path is given.
+_BUILD_DIR_CANDIDATES = ("build", "out", "cmake-build-debug", "cmake-build-release")
+
+
+def clang_kind_to_cpp(kind_name: str) -> str | None:
+    """Map a libclang CursorKind name to a cpp_* unit kind, or None if ignored."""
+    return CLANG_KIND_MAP.get(kind_name)
+
+
+def find_compile_commands(target: Path, explicit: str | Path | None = None) -> Path | None:
+    """
+    Return the directory containing a usable `compile_commands.json`, or None.
+    `explicit` may be the file itself or its directory. Auto-discovery looks in
+    the target, its parent, and common build subdirectories of both.
+    """
+    if explicit is not None:
+        p = Path(explicit)
+        if p.is_file() and p.name == "compile_commands.json":
+            return p.parent
+        if p.is_dir() and (p / "compile_commands.json").is_file():
+            return p
+        return None
+
+    target = Path(target)
+    roots = [target, target.parent]
+    for root in roots:
+        if (root / "compile_commands.json").is_file():
+            return root
+        for sub in _BUILD_DIR_CANDIDATES:
+            if (root / sub / "compile_commands.json").is_file():
+                return root / sub
+    return None
+
+
+def cpp_units_from_decls(decls: Iterable[dict], source_root: Path, id_factory) -> list[SourceUnit]:
+    """
+    Turn intermediate decl records (from iter_clang_decls) into SourceUnits.
+    Dedups by (path, start, end, kind, name) — the same header decl reached from
+    several translation units collapses to one — and assigns ids in a
+    deterministic (path, start_line) order so output is reproducible.
+    """
+    seen: set[tuple] = set()
+    unique: list[dict] = []
+    for d in decls:
+        key = (d["path"], d["start_line"], d["end_line"], d["kind"], d["name"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(d)
+    unique.sort(key=lambda d: (d["path"], d["start_line"], d["end_line"], d["name"]))
+
+    units: list[SourceUnit] = []
+    text_cache: dict[str, list[str]] = {}
+    for d in unique:
+        rel = d["path"]
+        if rel not in text_cache:
+            try:
+                text_cache[rel] = (source_root / rel).read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
+            except OSError:
+                text_cache[rel] = []
+        lines = text_cache[rel]
+        block = "\n".join(lines[d["start_line"] - 1:d["end_line"]])
+        units.append(SourceUnit(
+            id=id_factory(),
+            path=rel,
+            line_range=(d["start_line"], d["end_line"]),
+            kind=d["kind"],
+            name=d["name"],
+            signature=(d.get("signature") or d["name"])[:240],
+            fingerprint=fingerprint(block or d["name"]),
+        ))
+    return units
+
+
+def _clang_clean_args(cmd) -> list[str]:
+    """Strip the compiler argv[0], `-c`, `-o <out>`, and the input file from a
+    CompileCommand's arguments so they can be handed to Index.parse()."""
+    raw = list(cmd.arguments)[1:]
+    fname = Path(cmd.filename).name
+    out: list[str] = []
+    skip = False
+    for a in raw:
+        if skip:
+            skip = False
+            continue
+        if a == "-c":
+            continue
+        if a == "-o":
+            skip = True
+            continue
+        if a == cmd.filename or Path(a).name == fname:
+            continue
+        out.append(a)
+    return out
+
+
+def iter_clang_decls(build_dir: Path, target_path: Path) -> Iterable[dict]:
+    """
+    Parse every translation unit in the compilation database at `build_dir` and
+    yield decl records {path, start_line, end_line, kind, name, signature} for
+    definitions located inside the target tree. Requires libclang.
+
+    Definition test is `cursor.is_definition()` only — reliable for namespaces,
+    classes/structs/unions/enums, class templates, free functions, and methods
+    of non-template classes. Function templates and members of class templates
+    are not exposed as definitions by libclang and are intentionally skipped.
+    """
+    db = clang_cindex.CompilationDatabase.fromDirectory(str(build_dir))
+    index = clang_cindex.Index.create()
+    target_abs = target_path.resolve()
+    for cmd in db.getAllCompileCommands():
+        directory = Path(cmd.directory)
+        file_path = Path(cmd.filename)
+        if not file_path.is_absolute():
+            file_path = directory / file_path
+        try:
+            tu = index.parse(str(file_path), args=_clang_clean_args(cmd))
+        except clang_cindex.TranslationUnitLoadError:
+            continue
+        for cur in tu.cursor.walk_preorder():
+            kind = clang_kind_to_cpp(cur.kind.name)
+            if kind is None or not cur.is_definition():
+                continue
+            loc = cur.location.file
+            if loc is None:
+                continue
+            try:
+                cur_abs = Path(loc.name).resolve()
+                rel = cur_abs.relative_to(target_abs.parent).as_posix()
+            except (ValueError, OSError):
+                continue
+            # Only decls inside the target tree (skip system / third-party).
+            if not str(cur_abs).startswith(str(target_abs)):
+                continue
+            extent = cur.extent
+            name = cur.spelling
+            if not name:
+                continue
+            yield {
+                "path": rel,
+                "start_line": extent.start.line,
+                "end_line": extent.end.line,
+                "kind": kind,
+                "name": name,
+                "signature": cur.displayname or name,
+            }
+
+
+# ----------------------------------------------------------------------------
 # File classification and dispatch
 # ----------------------------------------------------------------------------
 
@@ -580,6 +773,7 @@ DEFAULT_EXCLUDES = [
 def build_source_map(
     target_path: Path,
     exclude_globs: list[str],
+    compile_commands: str | Path | None = None,
 ) -> dict:
     units: list[SourceUnit] = []
     files_scanned = 0
@@ -591,6 +785,23 @@ def build_source_map(
         return f"SRC-{next_id[0]:04d}"
 
     base = target_path.parent
+
+    # Optional high-fidelity C/C++ pass (libclang + compile_commands.json). Runs
+    # first so its units get the leading ids and stay deterministic. C/C++ files
+    # it covers are skipped by the regex pass below; anything it cannot reach
+    # (files absent from the database) still falls back to the regex extractor.
+    clang_covered: set[str] = set()
+    regex_cpp_ran = False
+    if HAS_LIBCLANG:
+        build_dir = find_compile_commands(target_path, compile_commands)
+        if build_dir is not None:
+            try:
+                decls = list(iter_clang_decls(build_dir, target_path))
+                clang_units = cpp_units_from_decls(decls, base, id_factory)
+                units.extend(clang_units)
+                clang_covered = {u.path for u in clang_units}
+            except Exception:  # pragma: no cover - degrade to regex on any error
+                clang_covered = set()
 
     for file_path in iter_target_files(target_path, exclude_globs):
         # POSIX-style (forward slash) so [REF:] markers, exclude globs, and
@@ -626,6 +837,10 @@ def build_source_map(
             elif strat == "dart_decl":
                 units.extend(extract_dart_units(rel_path, source, id_factory))
             elif strat == "cpp_decl":
+                if rel_path in clang_covered:
+                    # Already handled by the high-fidelity libclang pass.
+                    continue
+                regex_cpp_ran = True
                 cpp_units = list(extract_cpp_units(rel_path, source, id_factory))
                 if cpp_units:
                     units.extend(cpp_units)
@@ -651,6 +866,13 @@ def build_source_map(
     for u in units:
         by_kind[u.kind] = by_kind.get(u.kind, 0) + 1
 
+    if clang_covered and regex_cpp_ran:
+        cpp_extractor = "mixed"
+    elif clang_covered:
+        cpp_extractor = "clang"
+    else:
+        cpp_extractor = "regex"
+
     return {
         "schema_version": "0.1.0",
         "target_root": target_path.name,
@@ -660,6 +882,7 @@ def build_source_map(
             "files_excluded": files_excluded,
             "units_total": len(units),
             "by_kind": by_kind,
+            "cpp_extractor": cpp_extractor,
         },
         "units": [
             {
@@ -689,6 +912,14 @@ def main(argv: list[str] | None = None) -> int:
         default=",".join(DEFAULT_EXCLUDES),
         help="Comma-separated glob patterns to exclude",
     )
+    parser.add_argument(
+        "--compile-commands",
+        default=None,
+        help="Path to compile_commands.json (or its directory) for the optional "
+             "high-fidelity C/C++ extractor. Requires `pip install libclang`. "
+             "Auto-discovered in common build dirs when omitted; falls back to "
+             "the regex extractor when unavailable.",
+    )
     args = parser.parse_args(argv)
 
     target_path = Path(args.target).resolve()
@@ -697,7 +928,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     exclude_globs = [g.strip() for g in args.exclude_globs.split(",") if g.strip()]
-    out = build_source_map(target_path, exclude_globs)
+    out = build_source_map(target_path, exclude_globs, compile_commands=args.compile_commands)
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -713,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
         f"Written to {output_path}"
     )
     print(f"  by kind: {stats['by_kind']}")
+    print(f"  C/C++ extractor: {stats['cpp_extractor']}")
     return 0
 
 

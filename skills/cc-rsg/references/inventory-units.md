@@ -530,6 +530,34 @@ grep -rEn "add_(library|executable)\\(" . --include=CMakeLists.txt
 - Separate the public API (headers) from the implementation (`.c`/`.cpp`) when the
   spec distinguishes interface from internals.
 
+### High-fidelity extraction (optional)
+
+When a compilation database is available, `source-map.py` can parse C/C++ with
+**libclang** instead of regexes, which removes every "known gap" above (macros
+are expanded, templates and multi-line signatures resolve, out-of-line members
+and qualified names are exact, and `struct`-returning functions are never
+mistaken for type definitions). It also recovers methods of non-template
+classes as `cpp_function` units.
+
+Enable it:
+1. Generate the database — e.g. CMake (+ Ninja): configure with
+   `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, producing `build/compile_commands.json`.
+   (Other build systems: Bear `bear -- make`, or `compiledb`.)
+2. `pip install libclang` (bundles the native library; no separate LLVM needed).
+3. Run with `--compile-commands <build dir or compile_commands.json>` (the file
+   is also auto-discovered in `build/`, `out/`, `cmake-build-*`).
+
+The output schema is **identical** to the regex tier (same `cpp_*` kinds, line
+ranges, fingerprints), so the MECE / coverage / traceability chain is unchanged;
+`stats.cpp_extractor` reports `clang` / `regex` / `mixed`. When libclang or the
+database is missing, it **silently falls back to the regex extractor** — so the
+zero-dependency, no-build path (audits, onboarding where the project cannot be
+configured) keeps working. Only files present in the database use libclang;
+C/C++ files outside it still use regex. Remaining libclang-tier limitations:
+free **function templates** and members of **class templates** are not exposed
+as definitions by libclang and are skipped (the class template itself is still
+captured).
+
 ---
 
 ## Dart / Flutter
