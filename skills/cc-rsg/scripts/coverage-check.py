@@ -44,7 +44,7 @@ Usage:
       --min-sources-read-per-chapter 5 \\
       --min-inventory auto \\
       --max-macro-ratio 0.2 \\
-      --min-questions 10 \\
+      --min-questions auto \\
       --max-open-ratio 0.2 \\
       --min-covered-by-fill 0.9 \\
       --min-mece-coverage 0.7
@@ -82,8 +82,25 @@ MERMAID_FENCE_RE = re.compile(r"^```mermaid\b")
 SOURCES_READ_RE = re.compile(r"^##+\s*Sources\s*Read\b", re.IGNORECASE)
 SOURCES_READ_ITEM_RE = re.compile(r"^\s*[-*]\s+`?([^`\n]+?)`?(?:\s*\([^)]*\))?\s*$")
 
-# Keywords that make an INV count as "macro" (matched against the `type` field)
-MACRO_TYPE_KEYWORDS = ("group", "module", "domain", "category", "bundle", "section")
+# Confidence labels (outline/interactive mode). Each cell is counted once,
+# whether written as "🟢 VERIFIED", "VERIFIED", or "🟢" alone.
+VERIFIED_RE = re.compile(r"🟢\s*VERIFIED|VERIFIED|🟢")
+INFERRED_RE = re.compile(r"🟡\s*INFERRED|INFERRED|🟡")
+ASSUMED_RE = re.compile(r"🔴\s*ASSUMED|ASSUMED|🔴")
+
+# Grouping suffixes that mark a "macro" INV type (matched against the `type`
+# field). A type is also macro if one of its tokens is a bare grouping word.
+MACRO_TYPE_SUFFIXES = ("_group", "_bundle", "_category", "_section")
+MACRO_TYPE_TOKENS = {"group", "bundle", "category"}
+
+
+def count_confidence_labels(content: str) -> tuple[int, int, int]:
+    """Return (verified, inferred, assumed) counts, each label counted once."""
+    return (
+        len(VERIFIED_RE.findall(content)),
+        len(INFERRED_RE.findall(content)),
+        len(ASSUMED_RE.findall(content)),
+    )
 
 
 # ----------------------------------------------------------------------------
@@ -159,12 +176,20 @@ def load_inventory(path: Path) -> list[InventoryItem]:
     if not path.exists():
         raise FileNotFoundError(f"inventory.json not found: {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
+    # Tolerate both shapes: a top-level array, or an object with a "units" key.
+    if isinstance(data, list):
+        entries = data
+    elif isinstance(data, dict):
+        entries = data.get("units", [])
+    else:
+        entries = []
     items: list[InventoryItem] = []
-    for entry in data.get("units", []):
+    for entry in entries:
         items.append(
             InventoryItem(
                 id=entry["id"],
-                type=entry.get("type", ""),
+                # Accept both the canonical `type` and the legacy `unit_type`.
+                type=entry.get("type") or entry.get("unit_type", ""),
                 name=entry["name"],
                 file=entry.get("file", ""),
                 line=entry.get("line"),
@@ -276,18 +301,19 @@ def compute_chapter_metrics(name: str, content: str) -> ChapterMetrics:
             continue
         stripped = line.strip()
         if not stripped:
-            in_sources_read = False  # a blank line ends the Sources Read section
+            # A blank line does NOT close the Sources Read section. The canonical
+            # format is "## Sources Read" -> blank line -> bullet list, so the
+            # section must survive blanks; it closes only at the next heading.
             continue
         if SOURCES_READ_RE.match(line):
             in_sources_read = True
             continue
         if in_sources_read:
-            if SOURCES_READ_ITEM_RE.match(line):
+            # End when the next heading appears; otherwise count list items.
+            if line.startswith("#"):
+                in_sources_read = False
+            elif SOURCES_READ_ITEM_RE.match(line):
                 sources_read_count += 1
-            else:
-                # End when the next heading appears.
-                if line.startswith("#"):
-                    in_sources_read = False
             continue
         body_lines += 1
         refs += len(REF_RE.findall(line))
@@ -352,7 +378,17 @@ def detect_mentions(item: InventoryItem, drafts: dict[str, str]) -> list[str]:
 
 
 def is_macro_type(item: InventoryItem) -> bool:
-    return any(k in item.type.lower() for k in MACRO_TYPE_KEYWORDS)
+    """A type is "macro" (too coarse) only when it is an explicit grouping.
+
+    Uses suffix and whole-token matching instead of substring matching so that
+    legitimate layer names like `domain`, `module`, or `service` in clean
+    architecture / DDD are not misclassified.
+    """
+    t = item.type.lower()
+    if t.endswith(MACRO_TYPE_SUFFIXES):
+        return True
+    tokens = [tok for tok in re.split(r"[^a-z0-9]+", t) if tok]
+    return any(tok in MACRO_TYPE_TOKENS for tok in tokens)
 
 
 def check_question_integrity(
@@ -482,6 +518,17 @@ def check_required_files(target_dir: Path) -> list[str]:
 # Report construction
 # ----------------------------------------------------------------------------
 
+def compute_auto_min(value: str | int, file_count: int, *, floor: int, divisor: int) -> int:
+    """Resolve an "auto" threshold to max(floor, file_count // divisor).
+
+    A concrete value (int or numeric string) is returned as-is. Shared by the
+    inventory and question-count gates so both scale with codebase size.
+    """
+    if value == "auto":
+        return max(floor, file_count // divisor)
+    return int(value)
+
+
 def detect_depth_mode(cc_rsg_dir: Path) -> str:
     """Read goal.json (if present) and return the configured depth_mode.
 
@@ -508,7 +555,7 @@ def build_report(
     target_dir_name: str,
     min_inventory: str | int,
     max_macro_ratio: float,
-    min_questions: int,
+    min_questions: str | int,
     max_open_ratio: float,
     min_covered_by_fill: float,
     min_refs_per_chapter: int,
@@ -574,12 +621,10 @@ def build_report(
             min_sources_read=min_sources_read_per_chapter,
         )
 
-    # inventory min auto
-    if min_inventory == "auto":
-        file_count = load_source_map_count(cc_rsg_dir) or 0
-        required_min = max(50, file_count // 20)
-    else:
-        required_min = int(min_inventory)
+    # inventory / question minimums scale with codebase size when "auto".
+    file_count = load_source_map_count(cc_rsg_dir) or 0
+    required_min = compute_auto_min(min_inventory, file_count, floor=50, divisor=20)
+    required_min_questions = compute_auto_min(min_questions, file_count, floor=5, divisor=40)
 
     # Macro ratio
     macro_count = sum(1 for it in inventory if is_macro_type(it))
@@ -623,10 +668,11 @@ def build_report(
         gate_failures.append(
             f"inventory.covered_by fill rate {covered_by_fill_rate:.1%} < {min_covered_by_fill:.1%}"
         )
-    if len(questions) < min_questions:
+    if len(questions) < required_min_questions:
         gate_failures.append(
-            f"questions.json size {len(questions)} < required {min_questions} "
-            f"(raise more questions for Phase 5 dialogue)"
+            f"questions.json size {len(questions)} < required {required_min_questions} "
+            f"(raise more questions for Phase 5 dialogue, or record in questions.json "
+            f"why fewer are justified)"
         )
     if questions and open_ratio > max_open_ratio:
         gate_failures.append(
@@ -660,9 +706,10 @@ def build_report(
     verified = inferred = assumed = 0
     if depth_mode != "comprehensive":
         for _, content in chapters.items():
-            verified += content.count("🟢") + content.count("VERIFIED")
-            inferred += content.count("🟡") + content.count("INFERRED")
-            assumed  += content.count("🔴") + content.count("ASSUMED")
+            v, i, a = count_confidence_labels(content)
+            verified += v
+            inferred += i
+            assumed += a
         # Warn if the ASSUMED ratio is too high.
         total_labels = verified + inferred + assumed
         if total_labels > 0:
@@ -849,7 +896,8 @@ def main() -> int:
     p.add_argument("--min-inventory", default="auto",
                    help='Minimum item count. With "auto", compute max(50, files_scanned/20).')
     p.add_argument("--max-macro-ratio", type=float, default=0.2)
-    p.add_argument("--min-questions", type=int, default=10)
+    p.add_argument("--min-questions", default="auto",
+                   help='Minimum question count. With "auto", compute max(5, files_scanned/40).')
     p.add_argument("--max-open-ratio", type=float, default=0.2)
     p.add_argument("--min-covered-by-fill", type=float, default=0.9)
     p.add_argument("--min-mece-coverage", type=float, default=0.7)
