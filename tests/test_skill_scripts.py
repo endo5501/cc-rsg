@@ -1,11 +1,14 @@
 from pathlib import Path
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import py_compile
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -579,6 +582,109 @@ class ClangTierEndToEndTests(unittest.TestCase):
         self.assertIn("OnlyInB", by_name)
         self.assertEqual(by_name["OnlyInB"]["kind"], "cpp_class")
         self.assertEqual(out["stats"]["cpp_extractor"], "mixed")
+
+
+# ---------------------------------------------------------------------------
+# Item 1d: degraded C/C++ high-fidelity fallback is detected and reported
+# ---------------------------------------------------------------------------
+
+class ClangDegradationTests(unittest.TestCase):
+    def _cpp_proj(self, tmp: str, with_db: bool):
+        root = Path(tmp)
+        target = root / "src"
+        target.mkdir()
+        (target / "a.cpp").write_text("class A {\n  int x;\n};\n", encoding="utf-8")
+        if with_db:
+            src = (target / "a.cpp").resolve()
+            (root / "compile_commands.json").write_text(
+                json.dumps([{
+                    "directory": target.as_posix(),
+                    "file": src.as_posix(),
+                    "arguments": ["clang", "-std=c++17", "-c", "a.cpp"],
+                }]), encoding="utf-8")
+        return target, root
+
+    def _py_proj(self, tmp: str):
+        root = Path(tmp)
+        target = root / "src"
+        target.mkdir()
+        (target / "m.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+        return target
+
+    def test_libclang_missing_with_db_is_degraded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target, root = self._cpp_proj(tmp, with_db=True)
+            with mock.patch.object(source_map, "HAS_LIBCLANG", False):
+                out = source_map.build_source_map(
+                    target, source_map.DEFAULT_EXCLUDES, compile_commands=root)
+            st = out["stats"]
+            self.assertEqual(st["cpp_degraded_reason"], "libclang_missing")
+            self.assertTrue(st["compile_commands_found"])
+            self.assertFalse(st["libclang_available"])
+            self.assertIsNotNone(st["compile_commands_dir"])
+            self.assertEqual(st["cpp_extractor"], "regex")
+
+    def test_neither_libclang_nor_db(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target, _ = self._cpp_proj(tmp, with_db=False)
+            with mock.patch.object(source_map, "HAS_LIBCLANG", False):
+                out = source_map.build_source_map(target, source_map.DEFAULT_EXCLUDES)
+            st = out["stats"]
+            self.assertEqual(st["cpp_degraded_reason"], "libclang_and_db_missing")
+            self.assertFalse(st["compile_commands_found"])
+            self.assertIsNone(st["compile_commands_dir"])
+
+    @unittest.skipUnless(source_map.HAS_LIBCLANG, "libclang not installed")
+    def test_db_missing_with_libclang(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target, _ = self._cpp_proj(tmp, with_db=False)
+            out = source_map.build_source_map(target, source_map.DEFAULT_EXCLUDES)
+            st = out["stats"]
+            self.assertEqual(st["cpp_degraded_reason"], "db_missing")
+            self.assertTrue(st["libclang_available"])
+            self.assertFalse(st["compile_commands_found"])
+
+    def test_non_cpp_project_never_degraded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._py_proj(tmp)
+            with mock.patch.object(source_map, "HAS_LIBCLANG", False):
+                out = source_map.build_source_map(target, source_map.DEFAULT_EXCLUDES)
+            self.assertIsNone(out["stats"]["cpp_degraded_reason"])
+
+    def test_schema_version_and_new_stat_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._py_proj(tmp)
+            out = source_map.build_source_map(target, source_map.DEFAULT_EXCLUDES)
+            self.assertEqual(out["schema_version"], "0.2.0")
+            for k in ("libclang_available", "compile_commands_found",
+                      "compile_commands_dir", "cpp_degraded_reason"):
+                self.assertIn(k, out["stats"])
+
+    @unittest.skipUnless(source_map.HAS_LIBCLANG, "libclang not installed")
+    def test_high_fidelity_success_not_degraded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target, root = self._cpp_proj(tmp, with_db=True)
+            out = source_map.build_source_map(
+                target, source_map.DEFAULT_EXCLUDES, compile_commands=root)
+            st = out["stats"]
+            self.assertEqual(st["cpp_extractor"], "clang")
+            self.assertIsNone(st["cpp_degraded_reason"])
+            self.assertTrue(st["compile_commands_found"])
+
+    def test_main_warns_on_stderr_when_degraded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target, root = self._cpp_proj(tmp, with_db=True)
+            outpath = Path(tmp) / "sm.json"
+            err = io.StringIO()
+            with mock.patch.object(source_map, "HAS_LIBCLANG", False):
+                with contextlib.redirect_stderr(err):
+                    rc = source_map.main([
+                        "--target", str(target), "--output", str(outpath),
+                        "--compile-commands", str(root),
+                    ])
+            self.assertEqual(rc, 0)
+            self.assertIn("WARNING", err.getvalue())
+            self.assertIn("libclang", err.getvalue())
 
 
 # ---------------------------------------------------------------------------
