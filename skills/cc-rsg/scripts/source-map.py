@@ -14,6 +14,8 @@ traceability:
 - Ruby/Rails:  class / module level, controller action level, route group, migration, view
 - Python:      class / def level
 - JavaScript:  export level, function definitions
+- Dart:        class / mixin / enum / extension / top-level function level
+- Other src:   file level (any recognised text source extension)
 - Other:       file level (coarse, but far better than nothing)
 
 Usage:
@@ -94,6 +96,21 @@ JS_EXPORT_RE = re.compile(
 RAILS_ROUTE_BLOCK_RE = re.compile(
     r"^(\s*)(resources?|namespace|scope)\s+:?([A-Za-z0-9_]+)"
 )
+# Dart type declarations: class / mixin / enum / extension, with optional
+# leading modifiers (abstract, final, sealed, base, interface, mixin).
+DART_TYPE_RE = re.compile(
+    r"^(\s*)(?:(?:abstract|final|sealed|base|interface|mixin)\s+)*"
+    r"(class|mixin|enum|extension)\s+([A-Za-z_$][A-Za-z0-9_$]*)([^\n]*)"
+)
+# Dart top-level functions: a return type/name pair followed by `(` at column 0.
+# Conservative: skips control-flow keywords so `if (...)` / `for (...)` aren't matched.
+DART_TOP_FN_RE = re.compile(
+    r"^([A-Za-z_$][A-Za-z0-9_$<>,. ?]*?)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\([^;]*$"
+)
+DART_FN_KEYWORDS = {
+    "if", "for", "while", "switch", "catch", "return", "assert", "await",
+    "class", "enum", "mixin", "extension", "import", "export", "part", "library",
+}
 
 
 def fingerprint(text: str) -> str:
@@ -127,6 +144,29 @@ def extract_py_block(lines: list[str], start_idx: int, indent: str) -> int:
         cur_indent = len(ln) - len(ln.lstrip(" "))
         if cur_indent <= base:
             return j  # last line is j-1 (1-indexed: j)
+    return len(lines)
+
+
+def extract_brace_block(lines: list[str], start_idx: int) -> int:
+    """
+    Brace-language block: starting at `start_idx`, count `{`/`}` and return the
+    1-indexed line number where the brace depth returns to zero. Used for Dart.
+    Falls back to the start line + 1 when no opening brace is found (e.g. a
+    single-line `=>` function or an abstract declaration ending in `;`).
+    """
+    depth = 0
+    seen_open = False
+    for j in range(start_idx, len(lines)):
+        for ch in lines[j]:
+            if ch == "{":
+                depth += 1
+                seen_open = True
+            elif ch == "}":
+                depth -= 1
+        if seen_open and depth <= 0:
+            return j + 1  # 1-indexed
+        if not seen_open and (";" in lines[j] or "=>" in lines[j]) and j > start_idx:
+            return j + 1
     return len(lines)
 
 
@@ -227,6 +267,43 @@ def extract_js_units(rel_path: str, source: str, id_factory) -> Iterable[SourceU
             )
 
 
+def extract_dart_units(rel_path: str, source: str, id_factory) -> Iterable[SourceUnit]:
+    lines = source.splitlines()
+    for i, line in enumerate(lines):
+        m_type = DART_TYPE_RE.match(line)
+        if m_type:
+            indent, kw, name, rest = m_type.groups()
+            end_line = extract_brace_block(lines, i)
+            block_text = "\n".join(lines[i:end_line])
+            yield SourceUnit(
+                id=id_factory(),
+                path=rel_path,
+                line_range=(i + 1, end_line),
+                kind=f"dart_{kw}",
+                name=name,
+                signature=f"{kw} {name}{rest}".strip()[:240],
+                fingerprint=fingerprint(block_text),
+            )
+            continue
+        # Top-level functions only (indent must be empty; skip control flow).
+        if line[:1].strip():
+            m_fn = DART_TOP_FN_RE.match(line)
+            if m_fn:
+                ret, name = m_fn.groups()
+                if ret.split()[-1] not in DART_FN_KEYWORDS and name not in DART_FN_KEYWORDS:
+                    end_line = extract_brace_block(lines, i)
+                    block_text = "\n".join(lines[i:end_line])
+                    yield SourceUnit(
+                        id=id_factory(),
+                        path=rel_path,
+                        line_range=(i + 1, end_line),
+                        kind="dart_function",
+                        name=name,
+                        signature=line.strip()[:240],
+                        fingerprint=fingerprint(block_text),
+                    )
+
+
 def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> SourceUnit:
     """File-granularity coarse unit (used for migrations / views / configs, etc.)."""
     lines = source.splitlines()
@@ -246,12 +323,26 @@ def extract_file_unit(rel_path: str, source: str, kind: str, id_factory) -> Sour
 # File classification and dispatch
 # ----------------------------------------------------------------------------
 
+# Recognised text source extensions with no dedicated extractor. They are
+# still recorded as coarse file-level units so the MECE chain works on any
+# stack (matches the docstring contract: unsupported source => kind="file").
+# Binaries, images, and generic prose are deliberately excluded.
+GENERIC_SOURCE_EXTENSIONS = (
+    ".swift", ".kt", ".kts", ".java", ".scala", ".groovy", ".clj", ".cljs",
+    ".rs", ".go", ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp",
+    ".m", ".mm", ".cs", ".fs", ".php", ".pl", ".pm", ".lua", ".r",
+    ".ex", ".exs", ".erl", ".hs", ".ml", ".sh", ".bash", ".ps1",
+    ".gradle", ".cmake", ".tf", ".proto", ".graphql", ".gql",
+)
+
+
 def classify_file(rel_path: str) -> list[str]:
     """
     Return the list of one or more extraction strategies that apply to the file.
     Strategies look like ["ruby_class_def", "rails_view"].
-    Empty list = this file is not a unit-extraction target (but the source map
-    still records it as kind="file").
+    Empty list = this file is not a unit-extraction target (binary, image, or
+    generic prose). Recognised text source files with no dedicated extractor
+    fall back to a coarse file-level unit ("source_file").
     """
     p = rel_path.lower()
     strategies: list[str] = []
@@ -266,6 +357,8 @@ def classify_file(rel_path: str) -> list[str]:
         strategies.append("py_class_def")
     elif p.endswith((".js", ".jsx", ".ts", ".tsx", ".mjs")):
         strategies.append("js_export")
+    elif p.endswith(".dart"):
+        strategies.append("dart_decl")
     elif p.endswith((".erb", ".html.erb", ".html", ".vue", ".svelte")):
         strategies.append("view_file")
     elif p.endswith((".yml", ".yaml", ".toml", ".ini", ".conf", ".cfg")):
@@ -278,6 +371,9 @@ def classify_file(rel_path: str) -> list[str]:
         return []
     elif p.endswith(".sql"):
         strategies.append("sql_file")
+    elif p.endswith(GENERIC_SOURCE_EXTENSIONS):
+        # Recognised source language with no dedicated extractor: file-level unit.
+        strategies.append("source_file")
 
     return strategies
 
@@ -359,6 +455,10 @@ def build_source_map(
                 units.extend(extract_py_units(rel_path, source, id_factory))
             elif strat == "js_export":
                 units.extend(extract_js_units(rel_path, source, id_factory))
+            elif strat == "dart_decl":
+                units.extend(extract_dart_units(rel_path, source, id_factory))
+            elif strat == "source_file":
+                units.append(extract_file_unit(rel_path, source, "source_file", id_factory))
             elif strat == "view_file":
                 units.append(extract_file_unit(rel_path, source, "view_file", id_factory))
             elif strat == "config_file":
