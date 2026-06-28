@@ -1,6 +1,7 @@
 from pathlib import Path
 import importlib.util
 import json
+import os
 import py_compile
 import sys
 import tempfile
@@ -404,6 +405,49 @@ class CompileCommandsDiscoveryTests(unittest.TestCase):
             target.mkdir()
             self.assertIsNone(source_map.find_compile_commands(target))
 
+    def test_autodiscover_nested_config_subdir(self) -> None:
+        # Multi-config builds place the DB one level below the build dir,
+        # e.g. build/msvc_release/compile_commands.json.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "src"
+            target.mkdir()
+            ccj = root / "build" / "msvc_release" / "compile_commands.json"
+            ccj.parent.mkdir(parents=True)
+            ccj.write_text("[]", encoding="utf-8")
+            found = source_map.find_compile_commands(target)
+            self.assertEqual(found, ccj.parent)
+
+    def test_direct_build_db_preferred_over_nested(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "src"
+            target.mkdir()
+            direct = root / "build" / "compile_commands.json"
+            direct.parent.mkdir(parents=True)
+            direct.write_text("[]", encoding="utf-8")
+            nested = root / "build" / "msvc_release" / "compile_commands.json"
+            nested.parent.mkdir(parents=True)
+            nested.write_text("[]", encoding="utf-8")
+            found = source_map.find_compile_commands(target)
+            self.assertEqual(found, direct.parent)
+
+    def test_multiple_nested_configs_pick_newest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "src"
+            target.mkdir()
+            debug = root / "build" / "debug" / "compile_commands.json"
+            release = root / "build" / "release" / "compile_commands.json"
+            for p in (debug, release):
+                p.parent.mkdir(parents=True)
+                p.write_text("[]", encoding="utf-8")
+            # release built more recently than debug.
+            os.utime(debug, (1_000_000, 1_000_000))
+            os.utime(release, (2_000_000, 2_000_000))
+            found = source_map.find_compile_commands(target)
+            self.assertEqual(found, release.parent)
+
 
 class ClangKindMapTests(unittest.TestCase):
     """Pure: cursor-kind name → cpp_* kind (no libclang needed)."""
@@ -481,7 +525,7 @@ class CppUnitsFromDeclsTests(unittest.TestCase):
 class ClangTierEndToEndTests(unittest.TestCase):
     """libclang-backed extraction via a hand-written compile_commands.json."""
 
-    def _build_with_db(self, files: dict[str, str]):
+    def _build_with_db(self, files: dict[str, str], db_files=None):
         tmp = tempfile.mkdtemp()
         root = Path(tmp)
         target = root / "proj"
@@ -490,16 +534,18 @@ class ClangTierEndToEndTests(unittest.TestCase):
             p = target / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding="utf-8")
-        # Hand-written compile DB: one TU per .c/.cpp under target.
+        # Hand-written compile DB: one TU per file listed in db_files (default:
+        # every .c/.cpp). Files omitted here are absent from the database.
+        if db_files is None:
+            db_files = [r for r in files if r.endswith((".c", ".cc", ".cpp", ".cxx"))]
         db = []
-        for rel in files:
-            if rel.endswith((".c", ".cc", ".cpp", ".cxx")):
-                src = (target / rel).resolve()
-                db.append({
-                    "directory": target.as_posix(),
-                    "file": src.as_posix(),
-                    "arguments": ["clang", "-std=c++17", "-c", rel],
-                })
+        for rel in db_files:
+            src = (target / rel).resolve()
+            db.append({
+                "directory": target.as_posix(),
+                "file": src.as_posix(),
+                "arguments": ["clang", "-std=c++17", "-c", rel],
+            })
         (root / "compile_commands.json").write_text(
             json.dumps(db), encoding="utf-8")
         out = source_map.build_source_map(
@@ -528,7 +574,7 @@ class ClangTierEndToEndTests(unittest.TestCase):
         out = self._build_with_db({
             "a.cpp": "int main() { return 0; }\n",
             "b.cpp": "class OnlyInB {\n  int z;\n};\n",  # not in DB
-        })
+        }, db_files=["a.cpp"])
         by_name = {u["name"]: u for u in out["units"]}
         self.assertIn("OnlyInB", by_name)
         self.assertEqual(by_name["OnlyInB"]["kind"], "cpp_class")
