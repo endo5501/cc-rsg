@@ -35,6 +35,11 @@ order:
 
 Report a blocking prerequisite if none is available.
 
+libclang (`clang.cindex`) is an **optional** prerequisite for high-fidelity
+C/C++ extraction. Its absence is not blocking, but when `source-map.py` reports
+`stats.cpp_degraded_reason`, do not silently accept the regex output — follow
+the "interactive check" step in `phase-2-plan.md` to prompt the user.
+
 ## Failure behavior
 
 If web access is unavailable, register external facts as unverified rather than

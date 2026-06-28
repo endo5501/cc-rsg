@@ -48,6 +48,29 @@ yields **zero** units should you hand-generate a file-level `source-map.json`
 (one unit per source file, `line_range: [1, N]`) before running
 `build-trace.py`.
 
+### C/C++ high-fidelity extraction check (interactive)
+
+After running `source-map.py`, read the `stats` in `.cc-rsg/source-map.json`.
+If `stats.cpp_degraded_reason` is non-null (a C/C++ target where high-fidelity
+libclang extraction was possible but was not used), present the following to the
+user via the host's interaction mechanism (prefer a structured choice) and do
+not finalise Phase 2 until a decision is made:
+
+1. **(Recommended) Remediate and re-run** — per the reason:
+   - `libclang_missing` → `pip install libclang`;
+   - `db_missing` → generate `compile_commands.json` (e.g. CMake:
+     `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`);
+   - `libclang_and_db_missing` → both;
+   then re-run `source-map.py --compile-commands <stats.compile_commands_dir or
+   the build dir you generated>` and continue Phase 2 from the regenerated map.
+2. **Continue with regex** — record the decision in `recon-report.md` (risks /
+   limitations) and the known-limitations of `00-metadata.md` as "high-fidelity
+   C/C++ extraction not used (reason: <reason>)" and proceed.
+
+Append either decision to `state.json.session_history` (e.g. event
+`cpp_extractor_degraded_decision`). The regex output still supports MECE and
+traceability — this is a **fidelity choice, not a correctness gate**.
+
 ## Chapter skeleton
 
 Create `.cc-rsg/drafts/` and empty chapter files in confirmed order. Reserve:

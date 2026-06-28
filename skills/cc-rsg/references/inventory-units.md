@@ -551,10 +551,14 @@ Enable it:
 
 The output schema is **identical** to the regex tier (same `cpp_*` kinds, line
 ranges, fingerprints), so the MECE / coverage / traceability chain is unchanged;
-`stats.cpp_extractor` reports `clang` / `regex` / `mixed`. When libclang or the
-database is missing, it **silently falls back to the regex extractor** — so the
-zero-dependency, no-build path (audits, onboarding where the project cannot be
-configured) keeps working. Only files present in the database use libclang;
+`stats.cpp_extractor` reports `clang` / `regex` / `mixed`. When a high-fidelity
+run was possible but did not happen, the fallback is **not silent**: the
+extractor sets `stats.cpp_degraded_reason` (`libclang_missing` / `db_missing` /
+`libclang_and_db_missing` / `clang_failed`) and prints a stderr warning, and
+Phase 2 reads this signal to prompt the user to remediate (install libclang /
+generate the database → re-run). The zero-dependency, no-build regex path still
+works and remains available (this is a fidelity choice, not a correctness gate —
+it never blocks continuing). Only files present in the database use libclang;
 C/C++ files outside it still use regex. Remaining libclang-tier limitations:
 free **function templates** and members of **class templates** are not exposed
 as definitions by libclang and are skipped (the class template itself is still

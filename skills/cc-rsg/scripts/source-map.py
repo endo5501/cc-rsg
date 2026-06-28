@@ -18,6 +18,10 @@ multi-line signatures, anonymous `typedef struct` names). It degrades to the
 regex extractor when libclang or the database is missing, so the default
 behaviour and zero-dependency / no-build guarantees are unchanged. Pass the
 database via `--compile-commands`; the output schema is identical either way.
+When a high-fidelity run was possible but did not happen (e.g. the database is
+present but libclang is not installed), the fallback is no longer silent: it is
+reported via `stats.cpp_degraded_reason` and a stderr warning so the workflow
+can prompt the user to install libclang / generate the database and re-run.
 
 A source unit is the smallest item for which the spec wants
 traceability:
@@ -812,16 +816,21 @@ def build_source_map(
     # (files absent from the database) still falls back to the regex extractor.
     clang_covered: set[str] = set()
     regex_cpp_ran = False
-    if HAS_LIBCLANG:
-        build_dir = find_compile_commands(target_path, compile_commands)
-        if build_dir is not None:
-            try:
-                decls = list(iter_clang_decls(build_dir, target_path))
-                clang_units = cpp_units_from_decls(decls, base, id_factory)
-                units.extend(clang_units)
-                clang_covered = {u.path for u in clang_units}
-            except Exception:  # pragma: no cover - degrade to regex on any error
-                clang_covered = set()
+    clang_attempt_failed = False
+    # Detect the compilation database regardless of libclang, so a degraded
+    # fallback (DB present but libclang missing) is distinguishable from a plain
+    # "no database" case and can be surfaced to the user.
+    build_dir = find_compile_commands(target_path, compile_commands)
+    compile_commands_found = build_dir is not None
+    if HAS_LIBCLANG and build_dir is not None:
+        try:
+            decls = list(iter_clang_decls(build_dir, target_path))
+            clang_units = cpp_units_from_decls(decls, base, id_factory)
+            units.extend(clang_units)
+            clang_covered = {u.path for u in clang_units}
+        except Exception:  # high-fidelity parse failed -> degrade to regex
+            clang_covered = set()
+            clang_attempt_failed = True
 
     for file_path in iter_target_files(target_path, exclude_globs):
         # POSIX-style (forward slash) so [REF:] markers, exclude globs, and
@@ -893,8 +902,23 @@ def build_source_map(
     else:
         cpp_extractor = "regex"
 
+    # Flag the "degraded" case: this is a C/C++ project where high-fidelity
+    # extraction could have applied but did not, so Phase 2 can prompt the user.
+    # Stays None for non-C/C++ projects and for successful clang runs.
+    has_cpp = regex_cpp_ran or bool(clang_covered)
+    cpp_degraded_reason = None
+    if has_cpp and not clang_covered:
+        if compile_commands_found and not HAS_LIBCLANG:
+            cpp_degraded_reason = "libclang_missing"
+        elif HAS_LIBCLANG and not compile_commands_found:
+            cpp_degraded_reason = "db_missing"
+        elif not HAS_LIBCLANG and not compile_commands_found:
+            cpp_degraded_reason = "libclang_and_db_missing"
+        elif clang_attempt_failed:
+            cpp_degraded_reason = "clang_failed"
+
     return {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "target_root": target_path.name,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "stats": {
@@ -903,6 +927,10 @@ def build_source_map(
             "units_total": len(units),
             "by_kind": by_kind,
             "cpp_extractor": cpp_extractor,
+            "libclang_available": HAS_LIBCLANG,
+            "compile_commands_found": compile_commands_found,
+            "compile_commands_dir": (str(build_dir) if build_dir else None),
+            "cpp_degraded_reason": cpp_degraded_reason,
         },
         "units": [
             {
@@ -938,8 +966,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to compile_commands.json (or its directory) for the optional "
              "high-fidelity C/C++ extractor. Requires `pip install libclang`. "
              "Auto-discovered in common build dirs (and one level below, e.g. "
-             "build/<config>/) when omitted; falls back to the regex extractor "
-             "when unavailable.",
+             "build/<config>/) when omitted. Falls back to the regex extractor "
+             "when unavailable, reporting the degraded fallback via "
+             "stats.cpp_degraded_reason and a stderr warning.",
     )
     args = parser.parse_args(argv)
 
@@ -965,7 +994,37 @@ def main(argv: list[str] | None = None) -> int:
         f"Written to {output_path}"
     )
     print(f"  by kind: {stats['by_kind']}")
-    print(f"  C/C++ extractor: {stats['cpp_extractor']}")
+    reason = stats.get("cpp_degraded_reason")
+    extractor_line = f"  C/C++ extractor: {stats['cpp_extractor']}"
+    if reason:
+        extractor_line += f" (degraded: {reason})"
+    print(extractor_line)
+
+    if reason:
+        ccdir = stats.get("compile_commands_dir") or "<build dir>"
+        hints = {
+            "libclang_missing":
+                f"compile_commands.json found ({ccdir}) but the libclang Python "
+                f"binding is not installed; using the lower-fidelity regex extractor. "
+                f"Fix: pip install libclang, then re-run with --compile-commands {ccdir}.",
+            "db_missing":
+                "libclang is available but no compile_commands.json was found; using "
+                "regex. Fix: generate one (CMake: -DCMAKE_EXPORT_COMPILE_COMMANDS=ON) "
+                "then re-run with --compile-commands <build dir>.",
+            "libclang_and_db_missing":
+                "Neither libclang nor a compile_commands.json is available; using "
+                "regex. Fix: pip install libclang AND generate compile_commands.json, "
+                "then re-run with --compile-commands <build dir>.",
+            "clang_failed":
+                f"compile_commands.json found ({ccdir}) and libclang is installed, but "
+                f"high-fidelity parsing failed; fell back to regex. Check the database "
+                f"and libclang/LLVM versions.",
+        }
+        print(
+            f"source-map.py: WARNING (C/C++ high-fidelity extraction unavailable): "
+            f"{hints[reason]}",
+            file=sys.stderr,
+        )
     return 0
 
 
