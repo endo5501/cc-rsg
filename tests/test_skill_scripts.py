@@ -144,6 +144,153 @@ class SourceMapDartTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Item 1b: source-map.py C/C++ detailed extraction + file-level fallback
+# ---------------------------------------------------------------------------
+
+CPP_SAMPLE = """\
+#include <string>
+
+namespace app {
+
+class Foo : public Bar {
+ public:
+  void doit();
+  int value() const { return v_; }
+ private:
+  int v_;
+};
+
+struct Point {
+  int x;
+  int y;
+};
+
+union Value {
+  int i;
+  float f;
+};
+
+enum class Color { red, green, blue };
+
+}  // namespace app
+
+void Foo::doit() {
+  v_ = 42;
+}
+
+int main(int argc, char** argv) {
+  return 0;
+}
+"""
+
+C_SAMPLE = """\
+#include <stdlib.h>
+
+struct Node {
+  int data;
+  struct Node* next;
+};
+
+enum Status { OK, FAIL };
+
+int add(int a, int b) {
+  return a + b;
+}
+"""
+
+C_HEADER_PROTOTYPES_ONLY = """\
+#ifndef UTIL_H
+#define UTIL_H
+
+int add(int, int);
+void log_message(const char* msg);
+class Forward;
+
+#endif
+"""
+
+
+class SourceMapCppTests(unittest.TestCase):
+    def _build(self, files: dict[str, str]):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "src"
+            target.mkdir()
+            for rel, content in files.items():
+                p = target / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                if isinstance(content, bytes):
+                    p.write_bytes(content)
+                else:
+                    p.write_text(content, encoding="utf-8")
+            return source_map.build_source_map(target, source_map.DEFAULT_EXCLUDES)
+
+    def _units(self, out):
+        return {u["name"]: u for u in out["units"]}
+
+    def test_cpp_kinds_and_names(self) -> None:
+        out = self._build({"app.cpp": CPP_SAMPLE})
+        units = self._units(out)
+        self.assertEqual(units["Foo"]["kind"], "cpp_class")
+        self.assertEqual(units["Point"]["kind"], "cpp_struct")
+        self.assertEqual(units["Value"]["kind"], "cpp_union")
+        self.assertEqual(units["Color"]["kind"], "cpp_enum")
+        self.assertEqual(units["app"]["kind"], "cpp_namespace")
+        self.assertEqual(units["main"]["kind"], "cpp_function")
+
+    def test_enum_class_name_is_not_class(self) -> None:
+        out = self._build({"app.cpp": CPP_SAMPLE})
+        names = {u["name"] for u in out["units"]}
+        self.assertIn("Color", names)
+        self.assertNotIn("class", names)
+
+    def test_out_of_line_member_definition(self) -> None:
+        out = self._build({"app.cpp": CPP_SAMPLE})
+        units = self._units(out)
+        self.assertIn("doit", units)
+        self.assertEqual(units["doit"]["kind"], "cpp_function")
+
+    def test_prototype_does_not_create_function_unit(self) -> None:
+        out = self._build({"util.c": C_SAMPLE})
+        units = self._units(out)
+        # `add` is a real definition; ensure no spurious prototype duplicate.
+        self.assertEqual(units["add"]["kind"], "cpp_function")
+        add_units = [u for u in out["units"] if u["name"] == "add"]
+        self.assertEqual(len(add_units), 1)
+
+    def test_c_struct_and_enum(self) -> None:
+        out = self._build({"util.c": C_SAMPLE})
+        units = self._units(out)
+        self.assertEqual(units["Node"]["kind"], "cpp_struct")
+        self.assertEqual(units["Status"]["kind"], "cpp_enum")
+        self.assertEqual(units["add"]["kind"], "cpp_function")
+
+    def test_forward_declaration_not_a_unit(self) -> None:
+        out = self._build({"fwd.hpp": "class Forward;\nstruct AlsoFwd;\n"})
+        # No real definition → falls back to a single file-level unit.
+        self.assertEqual(out["stats"]["units_total"], 1)
+        self.assertEqual(out["units"][0]["kind"], "source_file")
+
+    def test_line_range_spans_body(self) -> None:
+        out = self._build({"app.cpp": CPP_SAMPLE})
+        foo = self._units(out)["Foo"]
+        start, end = foo["line_range"]
+        self.assertLessEqual(start, end)
+        self.assertGreaterEqual(end - start, 3)
+
+    def test_prototype_only_header_falls_back_to_file_unit(self) -> None:
+        out = self._build({"util.h": C_HEADER_PROTOTYPES_ONLY})
+        self.assertEqual(out["stats"]["units_total"], 1)
+        self.assertEqual(out["units"][0]["kind"], "source_file")
+
+    def test_cpp_unit_paths_use_forward_slashes(self) -> None:
+        out = self._build({"core/app.cpp": CPP_SAMPLE})
+        for u in out["units"]:
+            self.assertNotIn("\\", u["path"], u)
+        self.assertTrue(any("/" in u["path"] for u in out["units"]))
+
+
+# ---------------------------------------------------------------------------
 # Item 2: Sources Read section must survive blank lines
 # ---------------------------------------------------------------------------
 
